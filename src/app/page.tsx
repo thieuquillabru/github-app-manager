@@ -411,24 +411,30 @@ export default function Home() {
   const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { toast } = useToast()
 
-  // Load from localStorage on mount — always merge BUNDLED_APPS as base
+  // Load from localStorage on mount
   useEffect(() => {
     const stored = loadFromStorage<AppItem[]>(APPS_KEY, [])
     const storedSettings = loadFromStorage(SETTINGS_KEY, defaultSettings)
 
+    // Env var tokens always supplement stored settings (stored may be empty from old visit)
+    const envGhToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN || ''
+    const envVcToken = process.env.NEXT_PUBLIC_VERCEL_TOKEN || ''
+    const effectiveSettings: SyncSettings = {
+      ...storedSettings,
+      githubToken: storedSettings.githubToken || envGhToken,
+      vercelToken: storedSettings.vercelToken || envVcToken,
+    }
+
     if (stored.length === 0) {
-      // First visit — use bundled apps directly
+      // First visit — seed with bundled apps, sync will refresh
       setApps(BUNDLED_APPS)
       saveToStorage(APPS_KEY, BUNDLED_APPS)
     } else {
-      // Returning visit — ensure bundled apps are present, keep manual apps
-      const manualApps = stored.filter((a) => a.source === 'manual')
-      const merged = [...BUNDLED_APPS, ...manualApps]
-      setApps(merged)
-      saveToStorage(APPS_KEY, merged)
+      // Returning visit — use stored apps as-is (sync will reconcile)
+      setApps(stored)
     }
 
-    setSettings(storedSettings)
+    setSettings(effectiveSettings)
     const savedSync = localStorage.getItem('github-app-manager-last-sync')
     if (savedSync) setLastSync(savedSync)
     setMounted(true)
@@ -460,29 +466,43 @@ export default function Home() {
         syncedApps = [...syncedApps, ...vcApps]
       }
 
-      if (syncedApps.length > 0) {
-        setApps((prev) => {
-          const manualApps = prev.filter((a) => a.source === 'manual')
-          const now = new Date().toISOString()
-          const newAutoApps = syncedApps.map((sa, i) => {
-            const existing = prev.find(
-              (a) => a.id === sa.id
-            )
-            return {
-              ...sa,
-              order: existing?.order ?? (manualApps.length + i),
-              createdAt: existing?.createdAt ?? now,
-              updatedAt: now,
-            }
-          })
-          return [...newAutoApps, ...manualApps]
+      // Always replace ALL auto-synced apps with fresh API data (removes deleted, adds new)
+      let addedCount = 0
+      let removedCount = 0
+      let updatedCount = 0
+
+      setApps((prev) => {
+        const manualApps = prev.filter((a) => a.source === 'manual')
+        const prevAutoIds = new Set(prev.filter((a) => a.source !== 'manual').map((a) => a.id))
+        const nowAutoIds = new Set(syncedApps.map((sa) => sa.id))
+
+        addedCount = syncedApps.filter((sa) => !prevAutoIds.has(sa.id)).length
+        removedCount = [...prevAutoIds].filter((id) => !nowAutoIds.has(id)).length
+        updatedCount = syncedApps.filter((sa) => prevAutoIds.has(sa.id)).length
+
+        const now = new Date().toISOString()
+        const newAutoApps = syncedApps.map((sa, i) => {
+          const existing = prev.find((a) => a.id === sa.id)
+          return {
+            ...sa,
+            order: existing?.order ?? (manualApps.length + i),
+            createdAt: existing?.createdAt ?? now,
+            updatedAt: now,
+          }
         })
-      }
+        return [...newAutoApps, ...manualApps]
+      })
 
       const nowStr = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
       setLastSync(nowStr)
       localStorage.setItem('github-app-manager-last-sync', nowStr)
-      toast({ title: 'Synchronisation terminee', description: `${syncedApps.length} application(s) synchronisee(s).` })
+
+      const parts: string[] = []
+      if (syncedApps.length > 0) parts.push(`${syncedApps.length} app(s) au total`)
+      if (addedCount > 0) parts.push(`+${addedCount} nouvelle(s)`)
+      if (removedCount > 0) parts.push(`-${removedCount} supprimee(s)`)
+      if (updatedCount > 0) parts.push(`${updatedCount} mise(s) a jour`)
+      toast({ title: 'Synchronisation terminee', description: parts.join(', ') || 'Aucune application sync.' })
     } catch {
       toast({ title: 'Erreur de synchro', description: 'Impossible de synchroniser. Verifiez vos parametres.', variant: 'destructive' })
     } finally {
