@@ -393,6 +393,43 @@ async function fetchVercelProjects(token: string): Promise<Omit<AppItem, 'order'
   return apps
 }
 
+function getFaviconUrl(url: string): string {
+  try {
+    const domain = new URL(url).hostname
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+  } catch {
+    return ''
+  }
+}
+
+function FaviconIcon({ url, fallbackIcon, color }: { url: string; fallbackIcon: LucideIcon; color: string }) {
+  const FallbackIcon = fallbackIcon
+  const [imgError, setImgError] = useState(false)
+  const faviconUrl = getFaviconUrl(url)
+
+  if (!faviconUrl || imgError) {
+    return (
+      <div
+        className="flex items-center justify-center h-12 w-12 rounded-xl text-white shrink-0 shadow-sm"
+        style={{ backgroundColor: color }}
+      >
+        <FallbackIcon className="h-6 w-6" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-12 w-12 rounded-xl shrink-0 shadow-sm overflow-hidden bg-slate-100 dark:bg-slate-700 p-1.5 flex items-center justify-center">
+      <img
+        src={faviconUrl}
+        alt=""
+        className="w-full h-full object-contain rounded"
+        onError={() => setImgError(true)}
+      />
+    </div>
+  )
+}
+
 export default function Home() {
   const [apps, setApps] = useState<AppItem[]>([])
   const [settings, setSettings] = useState<SyncSettings>(defaultSettings)
@@ -834,12 +871,7 @@ export default function Home() {
                   <div className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          className="flex items-center justify-center h-10 w-10 rounded-lg text-white shrink-0 shadow-sm"
-                          style={{ backgroundColor: app.color }}
-                        >
-                          <IconComponent className="h-5 w-5" />
-                        </div>
+                        <FaviconIcon url={app.url} fallbackIcon={IconComponent} color={app.color} />
                         <div className="min-w-0">
                           <h3 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
                             {app.name}
