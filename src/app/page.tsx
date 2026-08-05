@@ -142,7 +142,7 @@ const defaultFormData = {
 }
 
 const defaultSettings: SyncSettings = {
-  githubUsername: '',
+  githubUsername: 'thieuquillabru',
   githubToken: '',
   vercelToken: '',
   autoSync: true,
@@ -233,9 +233,13 @@ async function fetchVercelProjects(token: string): Promise<Omit<AppItem, 'order'
 
     if (data.projects) {
       for (const project of data.projects) {
-        const targets = project.targets || []
-        const prodTarget = targets.find((t: { id: string }) => t.id === 'production')
-        const url = prodTarget?.url || `https://${project.name}-vercel.app`
+        const targets = project.targets
+        const prodTarget = targets?.production
+        const aliases: string[] = prodTarget?.alias || []
+        // Prefer clean alias like "project.vercel.app"
+        const cleanAlias = aliases.find((a: string) => /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(a) && !a.includes('git-') && !a.includes('-thieuquillabrus-'))
+        const fallbackAlias = aliases.find((a: string) => /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(a))
+        const url = cleanAlias || fallbackAlias || prodTarget?.url || `https://${project.name}.vercel.app`
 
         apps.push({
           id: `vercel-${project.id}`,
