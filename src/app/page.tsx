@@ -393,53 +393,89 @@ async function fetchVercelProjects(token: string): Promise<Omit<AppItem, 'order'
   return apps
 }
 
-function getFaviconUrls(url: string): string[] {
-  try {
-    const parsed = new URL(url)
-    const origin = parsed.origin
-    const domain = parsed.hostname
-    return [
-      `${origin}/favicon.ico`,
-      `https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${origin}&size=64`,
-      `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
-    ]
-  } catch {
-    return []
+// Generate a unique hue from a string (deterministic)
+function stringToHue(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
   }
+  return Math.abs(hash) % 360
 }
 
-function FaviconIcon({ url, fallbackIcon, color }: { url: string; fallbackIcon: LucideIcon; color: string }) {
+function AppIcon({ name, url, fallbackIcon, color }: { name: string; url: string; fallbackIcon: LucideIcon; color: string }) {
   const FallbackIcon = fallbackIcon
-  const [currentIdx, setCurrentIdx] = useState(0)
-  const [allFailed, setAllFailed] = useState(false)
-  const urls = getFaviconUrls(url)
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(null)
+  const [imgFailed, setImgFailed] = useState(false)
+  const letter = (name || '?')[0].toUpperCase()
+  const hue = stringToHue(name)
 
-  if (urls.length === 0 || allFailed) {
+  // Try to discover the real favicon
+  useEffect(() => {
+    let cancelled = false
+    async function probe() {
+      const sources = [
+        `${new URL(url).origin}/favicon.ico`,
+        `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`,
+      ]
+      for (const src of sources) {
+        if (cancelled) return
+        try {
+          const img = new Image()
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve()
+            img.onerror = () => reject()
+            img.src = src
+            // Timeout after 3s
+            setTimeout(() => reject(), 3000)
+          })
+          if (!cancelled) {
+            // Check it's not a 1x1 transparent pixel
+            const canvas = document.createElement('canvas')
+            canvas.width = 2
+            canvas.height = 2
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, 2, 2)
+              const data = ctx.getImageData(0, 0, 2, 2).data
+              const hasPixels = data[3] > 0 || data[7] > 0 || data[11] > 0 || data[15] > 0
+              if (hasPixels) {
+                setFaviconUrl(src)
+                return
+              }
+            }
+          }
+        } catch {
+          // try next source
+        }
+      }
+    }
+    probe()
+    return () => { cancelled = true }
+  }, [url])
+
+  // Show real favicon if available and loaded
+  if (faviconUrl && !imgFailed) {
     return (
-      <div
-        className="flex items-center justify-center h-12 w-12 rounded-xl text-white shrink-0 shadow-sm"
-        style={{ backgroundColor: color }}
-      >
-        <FallbackIcon className="h-6 w-6" />
+      <div className="h-12 w-12 rounded-xl shrink-0 shadow-sm overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 flex items-center justify-center">
+        <img
+          src={faviconUrl}
+          alt=""
+          className="w-8 h-8 object-contain"
+          onError={() => setImgFailed(true)}
+        />
       </div>
     )
   }
 
+  // Fallback: letter avatar with gradient
   return (
-    <div className="h-12 w-12 rounded-xl shrink-0 shadow-sm overflow-hidden bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center">
-      <img
-        src={urls[currentIdx]}
-        alt=""
-        className="w-8 h-8 object-contain"
-        onError={() => {
-          const next = currentIdx + 1
-          if (next < urls.length) {
-            setCurrentIdx(next)
-          } else {
-            setAllFailed(true)
-          }
-        }}
-      />
+    <div
+      className="flex items-center justify-center h-12 w-12 rounded-xl text-white shrink-0 shadow-sm font-bold text-lg select-none"
+      style={{
+        background: `linear-gradient(135deg, hsl(${hue}, 70%, 45%), hsl(${(hue + 40) % 360}, 70%, 55%))`,
+      }}
+    >
+      {letter}
     </div>
   )
 }
@@ -885,7 +921,7 @@ export default function Home() {
                   <div className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3 min-w-0">
-                        <FaviconIcon url={app.url} fallbackIcon={IconComponent} color={app.color} />
+                        <AppIcon name={app.name} url={app.url} fallbackIcon={IconComponent} color={app.color} />
                         <div className="min-w-0">
                           <h3 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
                             {app.name}
