@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Plus,
   ExternalLink,
@@ -28,6 +28,8 @@ import {
   Gamepad2,
   Palette,
   Music,
+  RefreshCw,
+  Key,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -98,17 +100,12 @@ const colorOptions = [
 ]
 
 const categoryPresets = [
-  'General',
-  'Frontend',
-  'Backend',
-  'Fullstack',
-  'Mobile',
-  'DevOps',
-  'API',
-  'Outils',
-  'Data',
-  'Design',
+  'General', 'Frontend', 'Backend', 'Fullstack',
+  'Mobile', 'DevOps', 'API', 'Outils', 'Data', 'Design',
 ]
+
+const GITHUB_PAGES_COLOR = '#24292e'
+const VERCEL_COLOR = '#000000'
 
 interface AppItem {
   id: string
@@ -121,9 +118,19 @@ interface AppItem {
   order: number
   createdAt: string
   updatedAt: string
+  source: 'manual' | 'github' | 'vercel'
+  repoName?: string
 }
 
-const STORAGE_KEY = 'github-app-manager-apps'
+interface SyncSettings {
+  githubUsername: string
+  githubToken: string
+  vercelToken: string
+  autoSync: boolean
+}
+
+const APPS_KEY = 'github-app-manager-apps'
+const SETTINGS_KEY = 'github-app-manager-settings'
 
 const defaultFormData = {
   name: '',
@@ -134,52 +141,226 @@ const defaultFormData = {
   icon: 'Link',
 }
 
+const defaultSettings: SyncSettings = {
+  githubUsername: '',
+  githubToken: '',
+  vercelToken: '',
+  autoSync: true,
+}
+
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 9)
 }
 
-function loadApps(): AppItem[] {
-  if (typeof window === 'undefined') return []
+function loadFromStorage<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : fallback
   } catch {
-    return []
+    return fallback
   }
 }
 
-function saveApps(apps: AppItem[]): void {
+function saveToStorage<T>(key: string, value: T): void {
   if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(apps))
+  localStorage.setItem(key, JSON.stringify(value))
+}
+
+// GitHub API
+async function fetchGithubPagesRepos(username: string, token: string): Promise<Omit<AppItem, 'order' | 'createdAt' | 'updatedAt'>[]> {
+  const headers: Record<string, string> = {
+    'Accept': 'application/vnd.github+json',
+  }
+  if (token) headers['Authorization'] = `token ${token}`
+
+  const apps: Omit<AppItem, 'order' | 'createdAt' | 'updatedAt'>[] = []
+  let page = 1
+  let hasMore = true
+
+  while (hasMore) {
+    const res = await fetch(
+      `https://api.github.com/users/${username}/repos?per_page=100&page=${page}&sort=updated`,
+      { headers }
+    )
+    if (!res.ok) break
+    const repos = await res.json()
+    if (!Array.isArray(repos) || repos.length === 0) break
+
+    const pagesRepos = repos.filter((r: { has_pages?: boolean }) => r.has_pages)
+
+    for (const repo of pagesRepos) {
+      const pagesRes = await fetch(
+        `https://api.github.com/repos/${username}/${repo.name}/pages`,
+        { headers }
+      )
+      if (pagesRes.ok) {
+        const pagesData = await pagesRes.json()
+        apps.push({
+          id: `github-${repo.name}`,
+          name: repo.name,
+          url: pagesData.html_url?.replace(/\/$/, '') || `https://${username}.github.io/${repo.name}`,
+          description: repo.description || null,
+          category: 'GitHub Pages',
+          color: GITHUB_PAGES_COLOR,
+          icon: 'Github',
+          source: 'github' as const,
+          repoName: repo.name,
+        })
+      }
+    }
+
+    hasMore = repos.length === 100
+    page++
+  }
+
+  return apps
+}
+
+// Vercel API
+async function fetchVercelProjects(token: string): Promise<Omit<AppItem, 'order' | 'createdAt' | 'updatedAt'>[]> {
+  const apps: Omit<AppItem, 'order' | 'createdAt' | 'updatedAt'>[] = []
+
+  try {
+    const res = await fetch('https://api.vercel.com/v9/projects?limit=100', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+    if (!res.ok) return apps
+    const data = await res.json()
+
+    if (data.projects) {
+      for (const project of data.projects) {
+        const targets = project.targets || []
+        const prodTarget = targets.find((t: { id: string }) => t.id === 'production')
+        const url = prodTarget?.url || `https://${project.name}-vercel.app`
+
+        apps.push({
+          id: `vercel-${project.id}`,
+          name: project.name,
+          url,
+          description: project.description || null,
+          category: 'Vercel',
+          color: VERCEL_COLOR,
+          icon: 'Zap',
+          source: 'vercel' as const,
+          repoName: project.name,
+        })
+      }
+    }
+  } catch {
+    // Vercel API error - silently fail
+  }
+
+  return apps
 }
 
 export default function Home() {
   const [apps, setApps] = useState<AppItem[]>([])
+  const [settings, setSettings] = useState<SyncSettings>(defaultSettings)
   const [mounted, setMounted] = useState(false)
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
+  const [filterSource, setFilterSource] = useState('all')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
   const [editingApp, setEditingApp] = useState<AppItem | null>(null)
   const [deletingApp, setDeletingApp] = useState<AppItem | null>(null)
   const [formData, setFormData] = useState(defaultFormData)
+  const [syncing, setSyncing] = useState(false)
+  const [lastSync, setLastSync] = useState<string | null>(null)
+  const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { toast } = useToast()
 
   // Load from localStorage on mount
   useEffect(() => {
-    setApps(loadApps())
+    setApps(loadFromStorage(APPS_KEY, []))
+    setSettings(loadFromStorage(SETTINGS_KEY, defaultSettings))
+    const savedSync = localStorage.getItem('github-app-manager-last-sync')
+    if (savedSync) setLastSync(savedSync)
     setMounted(true)
   }, [])
 
-  // Persist to localStorage whenever apps change
+  // Persist apps and settings
   useEffect(() => {
-    if (mounted) {
-      saveApps(apps)
-    }
+    if (mounted) saveToStorage(APPS_KEY, apps)
   }, [apps, mounted])
+
+  useEffect(() => {
+    if (mounted) saveToStorage(SETTINGS_KEY, settings)
+  }, [settings, mounted])
+
+  // Auto-sync on mount + interval
+  const doSync = useCallback(async () => {
+    if (!settings.githubUsername && !settings.vercelToken) return
+    setSyncing(true)
+    try {
+      let syncedApps: Omit<AppItem, 'order' | 'createdAt' | 'updatedAt'>[] = []
+
+      if (settings.githubUsername) {
+        const ghApps = await fetchGithubPagesRepos(settings.githubUsername, settings.githubToken)
+        syncedApps = [...syncedApps, ...ghApps]
+      }
+
+      if (settings.vercelToken) {
+        const vcApps = await fetchVercelProjects(settings.vercelToken)
+        syncedApps = [...syncedApps, ...vcApps]
+      }
+
+      if (syncedApps.length > 0) {
+        setApps((prev) => {
+          const manualApps = prev.filter((a) => a.source === 'manual')
+          const now = new Date().toISOString()
+          const newAutoApps = syncedApps.map((sa, i) => {
+            const existing = prev.find(
+              (a) => a.id === sa.id
+            )
+            return {
+              ...sa,
+              order: existing?.order ?? (manualApps.length + i),
+              createdAt: existing?.createdAt ?? now,
+              updatedAt: now,
+            }
+          })
+          return [...newAutoApps, ...manualApps]
+        })
+      }
+
+      const nowStr = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      setLastSync(nowStr)
+      localStorage.setItem('github-app-manager-last-sync', nowStr)
+      toast({ title: 'Synchronisation terminee', description: `${syncedApps.length} application(s) synchronisee(s).` })
+    } catch {
+      toast({ title: 'Erreur de synchro', description: 'Impossible de synchroniser. Verifiez vos parametres.', variant: 'destructive' })
+    } finally {
+      setSyncing(false)
+    }
+  }, [settings, toast])
+
+  // Auto-sync on mount when settings are ready
+  useEffect(() => {
+    if (mounted && settings.autoSync && (settings.githubUsername || settings.vercelToken)) {
+      const timer = setTimeout(() => doSync(), 500)
+      return () => clearTimeout(timer)
+    }
+  }, [mounted, settings.autoSync, settings.githubUsername, settings.vercelToken, doSync])
+
+  // Auto-sync interval (every 5 minutes)
+  useEffect(() => {
+    if (mounted && settings.autoSync && (settings.githubUsername || settings.vercelToken)) {
+      syncTimerRef.current = setInterval(doSync, 5 * 60 * 1000)
+      return () => {
+        if (syncTimerRef.current) clearInterval(syncTimerRef.current)
+      }
+    }
+  }, [mounted, settings.autoSync, settings.githubUsername, settings.vercelToken, doSync])
 
   // Get unique categories from apps
   const categories = ['all', ...Array.from(new Set(apps.map((a) => a.category)))]
+  const sourceOptions = ['all', 'github', 'vercel', 'manual']
 
   // Filter apps
   const filteredApps = apps.filter((app) => {
@@ -188,7 +369,8 @@ export default function Home() {
       app.url.toLowerCase().includes(search.toLowerCase()) ||
       (app.description?.toLowerCase().includes(search.toLowerCase()) ?? false)
     const matchCategory = filterCategory === 'all' || app.category === filterCategory
-    return matchSearch && matchCategory
+    const matchSource = filterSource === 'all' || app.source === filterSource
+    return matchSearch && matchCategory && matchSource
   })
 
   const openCreateDialog = () => {
@@ -217,19 +399,13 @@ export default function Home() {
 
   const handleSubmit = () => {
     if (!formData.name.trim() || !formData.url.trim()) {
-      toast({
-        title: 'Champs requis',
-        description: 'Le nom et l\'URL sont obligatoires.',
-        variant: 'destructive',
-      })
+      toast({ title: 'Champs requis', description: 'Le nom et l\'URL sont obligatoires.', variant: 'destructive' })
       return
     }
-
     let url = formData.url.trim()
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url
     }
-
     if (editingApp) {
       setApps((prev) =>
         prev.map((a) =>
@@ -251,11 +427,11 @@ export default function Home() {
         order: apps.length,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        source: 'manual',
       }
       setApps((prev) => [...prev, newApp])
       toast({ title: 'Application ajoutee', description: `${formData.name} a ete ajoute.` })
     }
-
     setDialogOpen(false)
   }
 
@@ -271,7 +447,13 @@ export default function Home() {
     return iconMap[iconName] || Link2
   }
 
-  // Prevent flash of empty state before localStorage loads
+  const sourceBadge = (source: AppItem['source']) => {
+    if (source === 'github') return <Badge variant='outline' className='text-[10px] px-1.5 py-0 border-slate-300 dark:border-slate-600 gap-1'><Github className='h-3 w-3' />GitHub</Badge>
+    if (source === 'vercel') return <Badge variant='outline' className='text-[10px] px-1.5 py-0 border-slate-300 dark:border-slate-600 gap-1'><Zap className='h-3 w-3' />Vercel</Badge>
+    return null
+  }
+
+  // Skeleton / loading before mount
   if (!mounted) {
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
@@ -281,7 +463,10 @@ export default function Home() {
               <div className="h-8 w-8 rounded-lg bg-slate-200 dark:bg-slate-700 animate-pulse" />
               <div className="h-6 w-40 rounded bg-slate-200 dark:bg-slate-700 animate-pulse" />
             </div>
-            <div className="h-9 w-32 rounded-lg bg-slate-200 dark:bg-slate-700 animate-pulse" />
+            <div className="flex gap-2">
+              <div className="h-9 w-9 rounded-lg bg-slate-200 dark:bg-slate-700 animate-pulse" />
+              <div className="h-9 w-32 rounded-lg bg-slate-200 dark:bg-slate-700 animate-pulse" />
+            </div>
           </div>
         </header>
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
@@ -313,13 +498,44 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <Button
-            onClick={openCreateDialog}
-            className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg shadow-violet-200 dark:shadow-violet-900/30 transition-all duration-200 hover:scale-[1.02]"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Ajouter
-          </Button>
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 relative"
+                  onClick={() => setSettingsDialogOpen(true)}
+                >
+                  <Key className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Parametres de synchro</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={doSync}
+                  disabled={syncing || (!settings.githubUsername && !settings.vercelToken)}
+                >
+                  <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {syncing ? 'Synchronisation...' : 'Synchroniser maintenant'}
+              </TooltipContent>
+            </Tooltip>
+            <Button
+              onClick={openCreateDialog}
+              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg shadow-violet-200 dark:shadow-violet-900/30 transition-all duration-200 hover:scale-[1.02]"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Ajouter</span>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -327,37 +543,55 @@ export default function Home() {
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
         {/* Stats Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-2">
-            <LayoutGrid className="h-4 w-4 text-slate-400" />
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              {filteredApps.length} application{filteredApps.length !== 1 ? 's' : ''}
-              {filterCategory !== 'all' && (
-                <Badge variant="secondary" className="ml-2 text-xs">
-                  {filterCategory}
-                </Badge>
-              )}
-            </span>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <LayoutGrid className="h-4 w-4 text-slate-400" />
+              <span className="text-sm text-slate-500 dark:text-slate-400">
+                {filteredApps.length} application{filteredApps.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            {lastSync && (
+              <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                Derniere synchro : {lastSync}
+              </span>
+            )}
+            {filterCategory !== 'all' && (
+              <Badge variant="secondary" className="text-xs">{filterCategory}</Badge>
+            )}
+            {filterSource !== 'all' && (
+              <Badge variant="secondary" className="text-xs">
+                {filterSource === 'github' ? 'GitHub Pages' : filterSource === 'vercel' ? 'Vercel' : 'Manuel'}
+              </Badge>
+            )}
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-64">
+            <div className="relative flex-1 sm:w-56">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
-                placeholder="Rechercher une app..."
+                placeholder="Rechercher..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
               />
               {search && (
-                <button
-                  onClick={() => setSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
+                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                   <X className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
+            <Select value={filterSource} onValueChange={setFilterSource}>
+              <SelectTrigger className="w-full sm:w-36 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                <SelectValue placeholder="Source" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes sources</SelectItem>
+                <SelectItem value="github">GitHub Pages</SelectItem>
+                <SelectItem value="vercel">Vercel</SelectItem>
+                <SelectItem value="manual">Manuel</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="w-full sm:w-40 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+              <SelectTrigger className="w-full sm:w-36 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                 <SelectValue placeholder="Categorie" />
               </SelectTrigger>
               <SelectContent>
@@ -371,51 +605,65 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Empty state when no settings configured */}
+        {apps.length === 0 && !settings.githubUsername && !settings.vercelToken && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="flex items-center justify-center h-20 w-20 rounded-2xl bg-violet-50 dark:bg-violet-950/30 mb-6">
+              <Key className="h-10 w-10 text-violet-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+              Configurez la synchronisation
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6">
+              Entrez votre nom d&apos;utilisateur GitHub et/ou votre token Vercel pour synchroniser automatiquement toutes vos applications déployées.
+            </p>
+            <Button
+              onClick={() => setSettingsDialogOpen(true)}
+              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white"
+            >
+              <Key className="h-4 w-4 mr-2" />
+              Configurer
+            </Button>
+          </div>
+        )}
+
         {/* App Grid */}
-        {filteredApps.length === 0 ? (
+        {filteredApps.length === 0 && (settings.githubUsername || settings.vercelToken) && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="flex items-center justify-center h-20 w-20 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-6">
               <Github className="h-10 w-10 text-slate-300 dark:text-slate-600" />
             </div>
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-              {search || filterCategory !== 'all'
+              {search || filterCategory !== 'all' || filterSource !== 'all'
                 ? 'Aucun resultat'
                 : 'Aucune application'}
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6">
-              {search || filterCategory !== 'all'
-                ? 'Essayez de modifier vos filtres de recherche.'
-                : 'Commencez par ajouter votre premiere application GitHub.'}
+              {search || filterCategory !== 'all' || filterSource !== 'all'
+                ? 'Essayez de modifier vos filtres.'
+                : 'Aucune application trouvee. Ajoutez-en manuellement ou attendez la synchro.'}
             </p>
-            {!search && filterCategory === 'all' && (
-              <Button
-                onClick={openCreateDialog}
-                variant="outline"
-                className="border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-400 dark:hover:bg-violet-950"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Ajouter une app
-              </Button>
-            )}
           </div>
-        ) : (
+        )}
+
+        {filteredApps.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredApps.map((app) => {
               const IconComponent = getIcon(app.icon)
+              const isAuto = app.source === 'github' || app.source === 'vercel'
               return (
                 <div
                   key={app.id}
-                  className="group relative bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all duration-200 overflow-hidden"
+                  className={`group relative bg-white dark:bg-slate-800/80 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden ${
+                    isAuto
+                      ? 'border-slate-200/80 dark:border-slate-700/40'
+                      : 'border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600'
+                  }`}
                 >
-                  {/* Color accent bar */}
-                  <div
-                    className="h-1 w-full"
-                    style={{ backgroundColor: app.color }}
-                  />
+                  <div className="h-1 w-full" style={{ backgroundColor: app.color }} />
                   <div className="p-4">
-                    {/* App Header */}
                     <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div
                           className="flex items-center justify-center h-10 w-10 rounded-lg text-white shrink-0 shadow-sm"
                           style={{ backgroundColor: app.color }}
@@ -426,36 +674,25 @@ export default function Home() {
                           <h3 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
                             {app.name}
                           </h3>
-                          <Badge
-                            variant="secondary"
-                            className="text-[10px] px-1.5 py-0 mt-0.5"
-                          >
-                            {app.category}
-                          </Badge>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            {sourceBadge(app.source)}
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Description */}
                     {app.description && (
                       <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-3">
                         {app.description}
                       </p>
                     )}
 
-                    {/* URL Preview */}
                     <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mb-3 font-mono">
                       {app.url}
                     </p>
 
-                    {/* Actions */}
                     <div className="flex items-center gap-1.5">
-                      <a
-                        href={app.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1"
-                      >
+                      <a href={app.url} target="_blank" rel="noopener noreferrer" className="flex-1">
                         <Button
                           size="sm"
                           className="w-full text-xs bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-sm"
@@ -464,32 +701,26 @@ export default function Home() {
                           Ouvrir
                         </Button>
                       </a>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                            onClick={() => openEditDialog(app)}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Modifier</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-slate-400 hover:text-red-500 dark:hover:text-red-400"
-                            onClick={() => openDeleteDialog(app)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Supprimer</TooltipContent>
-                      </Tooltip>
+                      {!isAuto && (
+                        <>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" onClick={() => openEditDialog(app)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Modifier</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500 dark:hover:text-red-400" onClick={() => openDeleteDialog(app)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Supprimer</TooltipContent>
+                          </Tooltip>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -503,10 +734,107 @@ export default function Home() {
       <footer className="mt-auto border-t bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 text-center">
           <p className="text-xs text-slate-400 dark:text-slate-500">
-            GitHub App Manager — Gerez vos liens d&apos;applications en un seul endroit
+            GitHub App Manager — Synchronisation automatique GitHub Pages & Vercel
           </p>
         </div>
       </footer>
+
+      {/* Settings Dialog */}
+      <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5 text-violet-600" />
+              Parametres de synchronisation
+            </DialogTitle>
+            <DialogDescription>
+              Configurez vos comptes pour synchroniser automatiquement vos applications déployées.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            {/* GitHub Username */}
+            <div className="grid gap-2">
+              <Label htmlFor="gh-username">Nom d&apos;utilisateur GitHub</Label>
+              <Input
+                id="gh-username"
+                placeholder="thieuquillabru"
+                value={settings.githubUsername}
+                onChange={(e) => setSettings({ ...settings, githubUsername: e.target.value })}
+              />
+              <p className="text-[11px] text-slate-400">Synchronisera tous les repos avec GitHub Pages activé.</p>
+            </div>
+
+            {/* GitHub Token (optional) */}
+            <div className="grid gap-2">
+              <Label htmlFor="gh-token">Token GitHub (optionnel)</Label>
+              <Input
+                id="gh-token"
+                type="password"
+                placeholder="ghp_xxxxxxxxxxxx"
+                value={settings.githubToken}
+                onChange={(e) => setSettings({ ...settings, githubToken: e.target.value })}
+              />
+              <p className="text-[11px] text-slate-400">Augmente la limite de requetes API. Stocké localement dans votre navigateur.</p>
+            </div>
+
+            {/* Vercel Token */}
+            <div className="grid gap-2">
+              <Label htmlFor="vc-token">Token Vercel</Label>
+              <Input
+                id="vc-token"
+                type="password"
+                placeholder="Vercel token"
+                value={settings.vercelToken}
+                onChange={(e) => setSettings({ ...settings, vercelToken: e.target.value })}
+              />
+              <p className="text-[11px] text-slate-400">
+                Créez un token sur{' '}
+                <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline">
+                  vercel.com/account/tokens
+                </a>
+              </p>
+            </div>
+
+            {/* Auto Sync Toggle */}
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label>Synchronisation automatique</Label>
+                <p className="text-[11px] text-slate-400">Synchro toutes les 5 minutes + au chargement</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettings({ ...settings, autoSync: !settings.autoSync })}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 ${
+                  settings.autoSync ? 'bg-violet-600' : 'bg-slate-200 dark:bg-slate-700'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    settings.autoSync ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSettingsDialogOpen(false)}>
+              Fermer
+            </Button>
+            <Button
+              onClick={() => {
+                setSettingsDialogOpen(false)
+                setTimeout(doSync, 300)
+              }}
+              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Enregistrer & Sync
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -514,94 +842,44 @@ export default function Home() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {editingApp ? (
-                <>
-                  <Pencil className="h-5 w-5 text-violet-600" />
-                  Modifier l&apos;application
-                </>
+                <><Pencil className="h-5 w-5 text-violet-600" />Modifier l&apos;application</>
               ) : (
-                <>
-                  <Plus className="h-5 w-5 text-violet-600" />
-                  Nouvelle application
-                </>
+                <><Plus className="h-5 w-5 text-violet-600" />Nouvelle application</>
               )}
             </DialogTitle>
             <DialogDescription>
-              {editingApp
-                ? 'Modifiez les informations de votre application.'
-                : 'Ajoutez une nouvelle application GitHub a votre collection.'}
+              {editingApp ? 'Modifiez les informations.' : 'Ajoutez une application manuellement.'}
             </DialogDescription>
           </DialogHeader>
-
           <div className="grid gap-4 py-2">
-            {/* Name */}
             <div className="grid gap-2">
-              <Label htmlFor="app-name">
-                Nom <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="app-name"
-                placeholder="Mon Application"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
+              <Label htmlFor="app-name">Nom <span className="text-red-500">*</span></Label>
+              <Input id="app-name" placeholder="Mon Application" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
             </div>
-
-            {/* URL */}
             <div className="grid gap-2">
-              <Label htmlFor="app-url">
-                URL <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="app-url"
-                placeholder="https://username.github.io/my-app"
-                value={formData.url}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-              />
+              <Label htmlFor="app-url">URL <span className="text-red-500">*</span></Label>
+              <Input id="app-url" placeholder="https://username.github.io/my-app" value={formData.url} onChange={(e) => setFormData({ ...formData, url: e.target.value })} />
             </div>
-
-            {/* Description */}
             <div className="grid gap-2">
               <Label htmlFor="app-desc">Description</Label>
-              <Textarea
-                id="app-desc"
-                placeholder="Decrivez votre application..."
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={2}
-              />
+              <Textarea id="app-desc" placeholder="Decrivez votre application..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} />
             </div>
-
-            {/* Category */}
             <div className="grid gap-2">
               <Label>Categorie</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(val) => setFormData({ ...formData, category: val })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choisir une categorie" />
-                </SelectTrigger>
+              <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
+                <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                 <SelectContent>
-                  {categoryPresets.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
+                  {categoryPresets.map((cat) => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Icon Picker */}
             <div className="grid gap-2">
               <Label>Icone</Label>
               <div className="grid grid-cols-6 gap-2">
                 {iconOptions.map((iconName) => {
                   const Ic = iconMap[iconName]
                   return (
-                    <button
-                      key={iconName}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, icon: iconName })}
+                    <button key={iconName} type="button" onClick={() => setFormData({ ...formData, icon: iconName })}
                       className={`flex items-center justify-center h-10 w-full rounded-lg border-2 transition-all duration-150 ${
                         formData.icon === iconName
                           ? 'border-violet-600 bg-violet-50 dark:bg-violet-950/30 text-violet-600'
@@ -614,43 +892,25 @@ export default function Home() {
                 })}
               </div>
             </div>
-
-            {/* Color Picker */}
             <div className="grid gap-2">
               <Label>Couleur</Label>
               <div className="flex flex-wrap gap-2">
                 {colorOptions.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, color })}
+                  <button key={color} type="button" onClick={() => setFormData({ ...formData, color })}
                     className={`h-8 w-8 rounded-full border-2 transition-all duration-150 flex items-center justify-center ${
-                      formData.color === color
-                        ? 'border-slate-900 dark:border-white scale-110'
-                        : 'border-transparent hover:scale-105'
+                      formData.color === color ? 'border-slate-900 dark:border-white scale-110' : 'border-transparent hover:scale-105'
                     }`}
                     style={{ backgroundColor: color }}
                   >
-                    {formData.color === color && (
-                      <Check className="h-4 w-4 text-white" />
-                    )}
+                    {formData.color === color && <Check className="h-4 w-4 text-white" />}
                   </button>
                 ))}
               </div>
             </div>
           </div>
-
           <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setDialogOpen(false)}
-            >
-              Annuler
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white"
-            >
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
+            <Button onClick={handleSubmit} className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white">
               {editingApp ? 'Enregistrer' : 'Ajouter'}
             </Button>
           </DialogFooter>
@@ -667,18 +927,13 @@ export default function Home() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               Cette action est irreversible. L&apos;application{' '}
-              <span className="font-semibold text-slate-900 dark:text-white">
-                {deletingApp?.name}
-              </span>{' '}
+              <span className="font-semibold text-slate-900 dark:text-white">{deletingApp?.name}</span>{' '}
               sera definitivement supprimee.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
               Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>
