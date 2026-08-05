@@ -23,7 +23,11 @@ jobs:
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
-      - run: bun run build
+      - name: Build with tokens
+        run: bun run build
+        env:
+          NEXT_PUBLIC_GITHUB_TOKEN: ${{ secrets.APP_GH_TOKEN }}
+          NEXT_PUBLIC_VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: out
