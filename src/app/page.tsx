@@ -411,10 +411,24 @@ export default function Home() {
   const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { toast } = useToast()
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount — always merge BUNDLED_APPS as base
   useEffect(() => {
-    setApps(loadFromStorage(APPS_KEY, BUNDLED_APPS))
-    setSettings(loadFromStorage(SETTINGS_KEY, defaultSettings))
+    const stored = loadFromStorage<AppItem[]>(APPS_KEY, [])
+    const storedSettings = loadFromStorage(SETTINGS_KEY, defaultSettings)
+
+    if (stored.length === 0) {
+      // First visit — use bundled apps directly
+      setApps(BUNDLED_APPS)
+      saveToStorage(APPS_KEY, BUNDLED_APPS)
+    } else {
+      // Returning visit — ensure bundled apps are present, keep manual apps
+      const manualApps = stored.filter((a) => a.source === 'manual')
+      const merged = [...BUNDLED_APPS, ...manualApps]
+      setApps(merged)
+      saveToStorage(APPS_KEY, merged)
+    }
+
+    setSettings(storedSettings)
     const savedSync = localStorage.getItem('github-app-manager-last-sync')
     if (savedSync) setLastSync(savedSync)
     setMounted(true)
