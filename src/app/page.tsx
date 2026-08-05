@@ -2,34 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  Plus,
-  ExternalLink,
-  Pencil,
-  Trash2,
-  Search,
-  Github,
-  LayoutGrid,
-  X,
-  Check,
-  Link2,
-  Globe,
-  Code2,
-  Database,
-  Server,
-  Smartphone,
-  Monitor,
-  Cloud,
-  Zap,
-  BookOpen,
-  ShoppingCart,
-  MessageSquare,
-  BarChart3,
-  Settings,
-  Gamepad2,
-  Palette,
-  Music,
-  RefreshCw,
-  Key,
+  Plus, ExternalLink, Pencil, Trash2, Search, Github, X, Check,
+  Link2, Globe, Code2, Database, Server, Smartphone, Monitor, Cloud,
+  Zap, BookOpen, ShoppingCart, MessageSquare, BarChart3, Settings,
+  Gamepad2, Palette, Music, RefreshCw, Key, ChevronRight, Filter,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -37,68 +13,34 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+  DialogFooter, DialogDescription,
 } from '@/components/ui/dialog'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 
-// Icon mapping
 const iconMap: Record<string, LucideIcon> = {
-  Link: Link2,
-  Globe: Globe,
-  Code: Code2,
-  Database: Database,
-  Server: Server,
-  Smartphone: Smartphone,
-  Monitor: Monitor,
-  Cloud: Cloud,
-  Zap: Zap,
-  BookOpen: BookOpen,
-  ShoppingCart: ShoppingCart,
-  MessageSquare: MessageSquare,
-  BarChart3: BarChart3,
-  Settings: Settings,
-  Gamepad2: Gamepad2,
-  Palette: Palette,
-  Music: Music,
-  Github: Github,
+  Link: Link2, Globe: Globe, Code: Code2, Database: Database, Server: Server,
+  Smartphone: Smartphone, Monitor: Monitor, Cloud: Cloud, Zap: Zap,
+  BookOpen: BookOpen, ShoppingCart: ShoppingCart, MessageSquare: MessageSquare,
+  BarChart3: BarChart3, Settings: Settings, Gamepad2: Gamepad2,
+  Palette: Palette, Music: Music, Github: Github,
 }
 
 const iconOptions = Object.keys(iconMap)
-
 const colorOptions = [
   '#6e40c9', '#0d9488', '#ea580c', '#dc2626',
   '#2563eb', '#7c3aed', '#db2777', '#059669',
   '#d97706', '#4f46e5', '#0891b2', '#65a30d',
 ]
-
 const categoryPresets = [
   'General', 'Frontend', 'Backend', 'Fullstack',
   'Mobile', 'DevOps', 'API', 'Outils', 'Data', 'Design',
@@ -108,38 +50,20 @@ const GITHUB_PAGES_COLOR = '#24292e'
 const VERCEL_COLOR = '#000000'
 
 interface AppItem {
-  id: string
-  name: string
-  url: string
-  description: string | null
-  category: string
-  color: string
-  icon: string
-  order: number
-  createdAt: string
-  updatedAt: string
-  source: 'manual' | 'github' | 'vercel'
+  id: string; name: string; url: string; description: string | null
+  category: string; color: string; icon: string; order: number
+  createdAt: string; updatedAt: string; source: 'manual' | 'github' | 'vercel'
   repoName?: string
 }
 
 interface SyncSettings {
-  githubUsername: string
-  githubToken: string
-  vercelToken: string
-  autoSync: boolean
+  githubUsername: string; githubToken: string; vercelToken: string; autoSync: boolean
 }
 
 const APPS_KEY = 'github-app-manager-apps'
 const SETTINGS_KEY = 'github-app-manager-settings'
 
-const defaultFormData = {
-  name: '',
-  url: '',
-  description: '',
-  category: 'General',
-  color: '#6e40c9',
-  icon: 'Link',
-}
+const defaultFormData = { name: '', url: '', description: '', category: 'General', color: '#6e40c9', icon: 'Link' }
 
 const defaultSettings: SyncSettings = {
   githubUsername: 'thieuquillabru',
@@ -148,334 +72,84 @@ const defaultSettings: SyncSettings = {
   autoSync: true,
 }
 
-// Apps pré-intégrées (bundlées) — visible immédiatement au premier chargement
 const BUNDLED_APPS: AppItem[] = [
-  // --- GitHub Pages ---
-  {
-    id: 'github-github-app-manager',
-    name: 'github-app-manager',
-    url: 'https://thieuquillabru.github.io/github-app-manager/',
-    description: 'GitHub App Manager',
-    category: 'GitHub Pages',
-    color: GITHUB_PAGES_COLOR,
-    icon: 'Github',
-    order: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    source: 'github',
-    repoName: 'github-app-manager',
-  },
-  {
-    id: 'github-discord-bot',
-    name: 'discord-bot',
-    url: 'https://thieuquillabru.github.io/discord-bot/',
-    description: 'Bot Discord modulaire',
-    category: 'GitHub Pages',
-    color: GITHUB_PAGES_COLOR,
-    icon: 'MessageSquare',
-    order: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    source: 'github',
-    repoName: 'discord-bot',
-  },
-  {
-    id: 'github-empire-forge-game',
-    name: 'empire-forge-game',
-    url: 'https://thieuquillabru.github.io/empire-forge-game/',
-    description: 'Empire Forge - Jeu de strategie 3D style Clash of Clans',
-    category: 'GitHub Pages',
-    color: GITHUB_PAGES_COLOR,
-    icon: 'Gamepad2',
-    order: 2,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    source: 'github',
-    repoName: 'empire-forge-game',
-  },
-  {
-    id: 'github-ExchangeMGA',
-    name: 'ExchangeMGA',
-    url: 'https://thieuquillabru.github.io/ExchangeMGA/',
-    description: 'Convertisseur Yuan -> Ariary (MGA) avec cours en temps reel',
-    category: 'GitHub Pages',
-    color: GITHUB_PAGES_COLOR,
-    icon: 'BarChart3',
-    order: 3,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    source: 'github',
-    repoName: 'ExchangeMGA',
-  },
-  {
-    id: 'github-EnergyX',
-    name: 'EnergyX',
-    url: 'https://thieuquillabru.github.io/EnergyX/',
-    description: 'EnergyX',
-    category: 'GitHub Pages',
-    color: GITHUB_PAGES_COLOR,
-    icon: 'Zap',
-    order: 4,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    source: 'github',
-    repoName: 'EnergyX',
-  },
-  {
-    id: 'github-akiba',
-    name: 'akiba',
-    url: 'https://thieuquillabru.github.io/akiba/',
-    description: "Gestion d'argent, tontine et education financiere — hors-ligne, sans compte, sans serveur. PWA en 8 langues et 166 devises.",
-    category: 'GitHub Pages',
-    color: GITHUB_PAGES_COLOR,
-    icon: 'BookOpen',
-    order: 5,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    source: 'github',
-    repoName: 'akiba',
-  },
-  {
-    id: 'github-Sanbox',
-    name: 'Sanbox',
-    url: 'https://thieuquillabru.github.io/Sanbox/',
-    description: 'Sanbox',
-    category: 'GitHub Pages',
-    color: GITHUB_PAGES_COLOR,
-    icon: 'Code2',
-    order: 6,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    source: 'github',
-    repoName: 'Sanbox',
-  },
-  // --- Vercel ---
-  {
-    id: 'vercel-prj_sYrYBUNllneM4DQr3dOszFeLfxxy',
-    name: 'agent-reach-web',
-    url: 'https://agent-reach-web-zeta.vercel.app',
-    description: 'Agent Reach Web',
-    category: 'Vercel',
-    color: VERCEL_COLOR,
-    icon: 'Globe',
-    order: 7,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    source: 'vercel',
-    repoName: 'agent-reach-web',
-  },
-  {
-    id: 'vercel-prj_128VPziESKTh5PTLVIxcjSQTPEkL',
-    name: 'yourenergyx',
-    url: 'https://yourenergyx.vercel.app',
-    description: 'YourEnergyX',
-    category: 'Vercel',
-    color: VERCEL_COLOR,
-    icon: 'Zap',
-    order: 8,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    source: 'vercel',
-    repoName: 'yourenergyx',
-  },
+  { id: 'github-github-app-manager', name: 'github-app-manager', url: 'https://thieuquillabru.github.io/github-app-manager/', description: 'GitHub App Manager', category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'Github', order: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'github-app-manager' },
+  { id: 'github-discord-bot', name: 'discord-bot', url: 'https://thieuquillabru.github.io/discord-bot/', description: 'Bot Discord modulaire', category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'MessageSquare', order: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'discord-bot' },
+  { id: 'github-empire-forge-game', name: 'empire-forge-game', url: 'https://thieuquillabru.github.io/empire-forge-game/', description: 'Empire Forge - Jeu de strategie 3D style Clash of Clans', category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'Gamepad2', order: 2, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'empire-forge-game' },
+  { id: 'github-ExchangeMGA', name: 'ExchangeMGA', url: 'https://thieuquillabru.github.io/ExchangeMGA/', description: 'Convertisseur Yuan -> Ariary (MGA) avec cours en temps reel', category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'BarChart3', order: 3, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'ExchangeMGA' },
+  { id: 'github-EnergyX', name: 'EnergyX', url: 'https://thieuquillabru.github.io/EnergyX/', description: 'EnergyX', category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'Zap', order: 4, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'EnergyX' },
+  { id: 'github-akiba', name: 'akiba', url: 'https://thieuquillabru.github.io/akiba/', description: "Gestion d'argent, tontine et education financiere. PWA en 8 langues et 166 devises.", category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'BookOpen', order: 5, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'akiba' },
+  { id: 'github-Sanbox', name: 'Sanbox', url: 'https://thieuquillabru.github.io/Sanbox/', description: 'Sanbox', category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'Code2', order: 6, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'Sanbox' },
+  { id: 'vercel-prj_sYrYBUNllneM4DQr3dOszFeLfxxy', name: 'agent-reach-web', url: 'https://agent-reach-web-zeta.vercel.app', description: 'Agent Reach Web', category: 'Vercel', color: VERCEL_COLOR, icon: 'Globe', order: 7, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'vercel', repoName: 'agent-reach-web' },
+  { id: 'vercel-prj_128VPziESKTh5PTLVIxcjSQTPEkL', name: 'yourenergyx', url: 'https://yourenergyx.vercel.app', description: 'YourEnergyX', category: 'Vercel', color: VERCEL_COLOR, icon: 'Zap', order: 8, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'vercel', repoName: 'yourenergyx' },
 ]
 
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).substring(2, 9)
-}
-
-function loadFromStorage<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') return fallback
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
-}
-
-function saveToStorage<T>(key: string, value: T): void {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(key, JSON.stringify(value))
-}
+function generateId(): string { return Date.now().toString(36) + Math.random().toString(36).substring(2, 9) }
+function loadFromStorage<T>(key: string, fallback: T): T { if (typeof window === 'undefined') return fallback; try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback } catch { return fallback } }
+function saveToStorage<T>(key: string, value: T): void { if (typeof window === 'undefined') return; localStorage.setItem(key, JSON.stringify(value)) }
 
 // GitHub API
 async function fetchGithubPagesRepos(username: string, token: string): Promise<Omit<AppItem, 'order' | 'createdAt' | 'updatedAt'>[]> {
-  const headers: Record<string, string> = {
-    'Accept': 'application/vnd.github+json',
-  }
+  const headers: Record<string, string> = { 'Accept': 'application/vnd.github+json' }
   if (token) headers['Authorization'] = `token ${token}`
-
   const apps: Omit<AppItem, 'order' | 'createdAt' | 'updatedAt'>[] = []
   let page = 1
   let hasMore = true
-
   while (hasMore) {
-    const res = await fetch(
-      `https://api.github.com/users/${username}/repos?per_page=100&page=${page}&sort=updated`,
-      { headers }
-    )
+    const res = await fetch(`https://api.github.com/users/${username}/repos?per_page=100&page=${page}&sort=updated`, { headers })
     if (!res.ok) break
     const repos = await res.json()
     if (!Array.isArray(repos) || repos.length === 0) break
-
     const pagesRepos = repos.filter((r: { has_pages?: boolean }) => r.has_pages)
-
     for (const repo of pagesRepos) {
-      const pagesRes = await fetch(
-        `https://api.github.com/repos/${username}/${repo.name}/pages`,
-        { headers }
-      )
+      const pagesRes = await fetch(`https://api.github.com/repos/${username}/${repo.name}/pages`, { headers })
       if (pagesRes.ok) {
         const pagesData = await pagesRes.json()
-        apps.push({
-          id: `github-${repo.name}`,
-          name: repo.name,
-          url: pagesData.html_url?.replace(/\/$/, '') || `https://${username}.github.io/${repo.name}`,
-          description: repo.description || null,
-          category: 'GitHub Pages',
-          color: GITHUB_PAGES_COLOR,
-          icon: 'Github',
-          source: 'github' as const,
-          repoName: repo.name,
-        })
+        apps.push({ id: `github-${repo.name}`, name: repo.name, url: pagesData.html_url?.replace(/\/$/, '') || `https://${username}.github.io/${repo.name}`, description: repo.description || null, category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'Github', source: 'github' as const, repoName: repo.name })
       }
     }
-
     hasMore = repos.length === 100
     page++
   }
-
   return apps
 }
 
 // Vercel API
 async function fetchVercelProjects(token: string): Promise<Omit<AppItem, 'order' | 'createdAt' | 'updatedAt'>[]> {
   const apps: Omit<AppItem, 'order' | 'createdAt' | 'updatedAt'>[] = []
-
   try {
-    const res = await fetch('https://api.vercel.com/v9/projects?limit=100', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    })
+    const res = await fetch('https://api.vercel.com/v9/projects?limit=100', { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } })
     if (!res.ok) return apps
     const data = await res.json()
-
     if (data.projects) {
       for (const project of data.projects) {
-        const targets = project.targets
-        const prodTarget = targets?.production
+        const prodTarget = project.targets?.production
         const aliases: string[] = prodTarget?.alias || []
-        // Prefer clean alias like "project.vercel.app"
         const cleanAlias = aliases.find((a: string) => /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(a) && !a.includes('git-') && !a.includes('-thieuquillabrus-'))
         const fallbackAlias = aliases.find((a: string) => /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(a))
         const url = cleanAlias || fallbackAlias || prodTarget?.url || `https://${project.name}.vercel.app`
-
-        apps.push({
-          id: `vercel-${project.id}`,
-          name: project.name,
-          url,
-          description: project.description || null,
-          category: 'Vercel',
-          color: VERCEL_COLOR,
-          icon: 'Zap',
-          source: 'vercel' as const,
-          repoName: project.name,
-        })
+        apps.push({ id: `vercel-${project.id}`, name: project.name, url, description: project.description || null, category: 'Vercel', color: VERCEL_COLOR, icon: 'Zap', source: 'vercel' as const, repoName: project.name })
       }
     }
-  } catch {
-    // Vercel API error - silently fail
-  }
-
+  } catch { /* Vercel API error */ }
   return apps
 }
 
-// Generate a unique hue from a string (deterministic)
 function stringToHue(str: string): number {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return Math.abs(hash) % 360
+ let hash = 0
+ for (let i = 0; i < str.length; i++) { hash = str.charCodeAt(i) + ((hash << 5) - hash) }
+ return Math.abs(hash) % 360
 }
 
-function AppIcon({ name, url, fallbackIcon, color }: { name: string; url: string; fallbackIcon: LucideIcon; color: string }) {
-  const FallbackIcon = fallbackIcon
-  const [faviconUrl, setFaviconUrl] = useState<string | null>(null)
-  const [imgFailed, setImgFailed] = useState(false)
+function AppIcon({ name, url }: { name: string; url: string }) {
   const letter = (name || '?')[0].toUpperCase()
   const hue = stringToHue(name)
-
-  // Try to discover the real favicon
-  useEffect(() => {
-    let cancelled = false
-    async function probe() {
-      const sources = [
-        `${new URL(url).origin}/favicon.ico`,
-        `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=128`,
-      ]
-      for (const src of sources) {
-        if (cancelled) return
-        try {
-          const img = new Image()
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve()
-            img.onerror = () => reject()
-            img.src = src
-            // Timeout after 3s
-            setTimeout(() => reject(), 3000)
-          })
-          if (!cancelled) {
-            // Check it's not a 1x1 transparent pixel
-            const canvas = document.createElement('canvas')
-            canvas.width = 2
-            canvas.height = 2
-            const ctx = canvas.getContext('2d')
-            if (ctx) {
-              ctx.drawImage(img, 0, 0, 2, 2)
-              const data = ctx.getImageData(0, 0, 2, 2).data
-              const hasPixels = data[3] > 0 || data[7] > 0 || data[11] > 0 || data[15] > 0
-              if (hasPixels) {
-                setFaviconUrl(src)
-                return
-              }
-            }
-          }
-        } catch {
-          // try next source
-        }
-      }
-    }
-    probe()
-    return () => { cancelled = true }
-  }, [url])
-
-  // Show real favicon if available and loaded
-  if (faviconUrl && !imgFailed) {
-    return (
-      <div className="h-12 w-12 rounded-xl shrink-0 shadow-sm overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 flex items-center justify-center">
-        <img
-          src={faviconUrl}
-          alt=""
-          className="w-8 h-8 object-contain"
-          onError={() => setImgFailed(true)}
-        />
-      </div>
-    )
-  }
-
-  // Fallback: letter avatar with gradient
   return (
     <div
-      className="flex items-center justify-center h-12 w-12 rounded-xl text-white shrink-0 shadow-sm font-bold text-lg select-none"
-      style={{
-        background: `linear-gradient(135deg, hsl(${hue}, 70%, 45%), hsl(${(hue + 40) % 360}, 70%, 55%))`,
-      }}
+      className="flex items-center justify-center h-11 w-11 rounded-2xl text-white shrink-0 select-none"
+      style={{ background: `linear-gradient(145deg, hsl(${hue}, 65%, 48%), hsl(${(hue + 35) % 360}, 70%, 58%))` }}
     >
-      {letter}
+      <span className="text-[15px] font-semibold tracking-tight drop-shadow-sm">{letter}</span>
     </div>
   )
 }
@@ -495,486 +169,226 @@ export default function Home() {
   const [formData, setFormData] = useState(defaultFormData)
   const [syncing, setSyncing] = useState(false)
   const [lastSync, setLastSync] = useState<string | null>(null)
+  const [showSearch, setShowSearch] = useState(false)
   const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { toast } = useToast()
 
-  // Load from localStorage on mount
   useEffect(() => {
     const stored = loadFromStorage<AppItem[]>(APPS_KEY, [])
     const storedSettings = loadFromStorage(SETTINGS_KEY, defaultSettings)
-
-    // Env var tokens always supplement stored settings (stored may be empty from old visit)
     const envGhToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN || ''
     const envVcToken = process.env.NEXT_PUBLIC_VERCEL_TOKEN || ''
-    const effectiveSettings: SyncSettings = {
-      ...storedSettings,
-      githubToken: storedSettings.githubToken || envGhToken,
-      vercelToken: storedSettings.vercelToken || envVcToken,
-    }
-
-    if (stored.length === 0) {
-      // First visit — seed with bundled apps, sync will refresh
-      setApps(BUNDLED_APPS)
-      saveToStorage(APPS_KEY, BUNDLED_APPS)
-    } else {
-      // Returning visit — use stored apps as-is (sync will reconcile)
-      setApps(stored)
-    }
-
+    const effectiveSettings: SyncSettings = { ...storedSettings, githubToken: storedSettings.githubToken || envGhToken, vercelToken: storedSettings.vercelToken || envVcToken }
+    if (stored.length === 0) { setApps(BUNDLED_APPS); saveToStorage(APPS_KEY, BUNDLED_APPS) } else { setApps(stored) }
     setSettings(effectiveSettings)
     const savedSync = localStorage.getItem('github-app-manager-last-sync')
     if (savedSync) setLastSync(savedSync)
     setMounted(true)
   }, [])
 
-  // Persist apps and settings
-  useEffect(() => {
-    if (mounted) saveToStorage(APPS_KEY, apps)
-  }, [apps, mounted])
+  useEffect(() => { if (mounted) saveToStorage(APPS_KEY, apps) }, [apps, mounted])
+  useEffect(() => { if (mounted) saveToStorage(SETTINGS_KEY, settings) }, [settings, mounted])
 
-  useEffect(() => {
-    if (mounted) saveToStorage(SETTINGS_KEY, settings)
-  }, [settings, mounted])
-
-  // Auto-sync on mount + interval
   const doSync = useCallback(async () => {
     if (!settings.githubUsername && !settings.vercelToken) return
     setSyncing(true)
     try {
       let syncedApps: Omit<AppItem, 'order' | 'createdAt' | 'updatedAt'>[] = []
-
-      if (settings.githubUsername) {
-        const ghApps = await fetchGithubPagesRepos(settings.githubUsername, settings.githubToken)
-        syncedApps = [...syncedApps, ...ghApps]
-      }
-
-      if (settings.vercelToken) {
-        const vcApps = await fetchVercelProjects(settings.vercelToken)
-        syncedApps = [...syncedApps, ...vcApps]
-      }
-
-      // Always replace ALL auto-synced apps with fresh API data (removes deleted, adds new)
-      let addedCount = 0
-      let removedCount = 0
-      let updatedCount = 0
-
+      if (settings.githubUsername) syncedApps = [...syncedApps, ...await fetchGithubPagesRepos(settings.githubUsername, settings.githubToken)]
+      if (settings.vercelToken) syncedApps = [...syncedApps, ...await fetchVercelProjects(settings.vercelToken)]
+      let addedCount = 0; let removedCount = 0; let updatedCount = 0
       setApps((prev) => {
         const manualApps = prev.filter((a) => a.source === 'manual')
         const prevAutoIds = new Set(prev.filter((a) => a.source !== 'manual').map((a) => a.id))
         const nowAutoIds = new Set(syncedApps.map((sa) => sa.id))
-
         addedCount = syncedApps.filter((sa) => !prevAutoIds.has(sa.id)).length
         removedCount = [...prevAutoIds].filter((id) => !nowAutoIds.has(id)).length
         updatedCount = syncedApps.filter((sa) => prevAutoIds.has(sa.id)).length
-
         const now = new Date().toISOString()
-        const newAutoApps = syncedApps.map((sa, i) => {
-          const existing = prev.find((a) => a.id === sa.id)
-          return {
-            ...sa,
-            order: existing?.order ?? (manualApps.length + i),
-            createdAt: existing?.createdAt ?? now,
-            updatedAt: now,
-          }
-        })
+        const newAutoApps = syncedApps.map((sa, i) => { const existing = prev.find((a) => a.id === sa.id); return { ...sa, order: existing?.order ?? (manualApps.length + i), createdAt: existing?.createdAt ?? now, updatedAt: now } })
         return [...newAutoApps, ...manualApps]
       })
-
       const nowStr = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
       setLastSync(nowStr)
       localStorage.setItem('github-app-manager-last-sync', nowStr)
-
       const parts: string[] = []
-      if (syncedApps.length > 0) parts.push(`${syncedApps.length} app(s) au total`)
-      if (addedCount > 0) parts.push(`+${addedCount} nouvelle(s)`)
-      if (removedCount > 0) parts.push(`-${removedCount} supprimee(s)`)
-      if (updatedCount > 0) parts.push(`${updatedCount} mise(s) a jour`)
-      toast({ title: 'Synchronisation terminee', description: parts.join(', ') || 'Aucune application sync.' })
-    } catch {
-      toast({ title: 'Erreur de synchro', description: 'Impossible de synchroniser. Verifiez vos parametres.', variant: 'destructive' })
-    } finally {
-      setSyncing(false)
-    }
+      if (syncedApps.length > 0) parts.push(`${syncedApps.length} app(s)`)
+      if (addedCount > 0) parts.push(`+${addedCount}`)
+      if (removedCount > 0) parts.push(`-${removedCount}`)
+      toast({ title: 'Synchronise', description: parts.join(', ') || 'Aucune application.' })
+    } catch { toast({ title: 'Erreur', description: 'Echec de la synchronisation.', variant: 'destructive' }) } finally { setSyncing(false) }
   }, [settings, toast])
 
-  // Auto-sync on mount when settings are ready
   useEffect(() => {
-    if (mounted && settings.autoSync && (settings.githubUsername || settings.vercelToken)) {
-      const timer = setTimeout(() => doSync(), 500)
-      return () => clearTimeout(timer)
-    }
+    if (mounted && settings.autoSync && (settings.githubUsername || settings.vercelToken)) { const t = setTimeout(doSync, 500); return () => clearTimeout(t) }
+  }, [mounted, settings.autoSync, settings.githubUsername, settings.vercelToken, doSync])
+  useEffect(() => {
+    if (mounted && settings.autoSync && (settings.githubUsername || settings.vercelToken)) { syncTimerRef.current = setInterval(doSync, 5 * 60 * 1000); return () => { if (syncTimerRef.current) clearInterval(syncTimerRef.current) } }
   }, [mounted, settings.autoSync, settings.githubUsername, settings.vercelToken, doSync])
 
-  // Auto-sync interval (every 5 minutes)
-  useEffect(() => {
-    if (mounted && settings.autoSync && (settings.githubUsername || settings.vercelToken)) {
-      syncTimerRef.current = setInterval(doSync, 5 * 60 * 1000)
-      return () => {
-        if (syncTimerRef.current) clearInterval(syncTimerRef.current)
-      }
-    }
-  }, [mounted, settings.autoSync, settings.githubUsername, settings.vercelToken, doSync])
-
-  // Get unique categories from apps
   const categories = ['all', ...Array.from(new Set(apps.map((a) => a.category)))]
-  const sourceOptions = ['all', 'github', 'vercel', 'manual']
-
-  // Filter apps
   const filteredApps = apps.filter((app) => {
-    const matchSearch =
-      app.name.toLowerCase().includes(search.toLowerCase()) ||
-      app.url.toLowerCase().includes(search.toLowerCase()) ||
-      (app.description?.toLowerCase().includes(search.toLowerCase()) ?? false)
-    const matchCategory = filterCategory === 'all' || app.category === filterCategory
-    const matchSource = filterSource === 'all' || app.source === filterSource
-    return matchSearch && matchCategory && matchSource
+    const s = search.toLowerCase()
+    const matchSearch = app.name.toLowerCase().includes(s) || app.url.toLowerCase().includes(s) || (app.description?.toLowerCase().includes(s) ?? false)
+    return matchSearch && (filterCategory === 'all' || app.category === filterCategory) && (filterSource === 'all' || app.source === filterSource)
   })
+  const ghCount = apps.filter(a => a.source === 'github').length
+  const vcCount = apps.filter(a => a.source === 'vercel').length
+  const mnCount = apps.filter(a => a.source === 'manual').length
 
-  const openCreateDialog = () => {
-    setEditingApp(null)
-    setFormData(defaultFormData)
-    setDialogOpen(true)
-  }
-
-  const openEditDialog = (app: AppItem) => {
-    setEditingApp(app)
-    setFormData({
-      name: app.name,
-      url: app.url,
-      description: app.description || '',
-      category: app.category,
-      color: app.color,
-      icon: app.icon,
-    })
-    setDialogOpen(true)
-  }
-
-  const openDeleteDialog = (app: AppItem) => {
-    setDeletingApp(app)
-    setDeleteDialogOpen(true)
-  }
-
+  const openCreateDialog = () => { setEditingApp(null); setFormData(defaultFormData); setDialogOpen(true) }
+  const openEditDialog = (app: AppItem) => { setEditingApp(app); setFormData({ name: app.name, url: app.url, description: app.description || '', category: app.category, color: app.color, icon: app.icon }); setDialogOpen(true) }
+  const openDeleteDialog = (app: AppItem) => { setDeletingApp(app); setDeleteDialogOpen(true) }
   const handleSubmit = () => {
-    if (!formData.name.trim() || !formData.url.trim()) {
-      toast({ title: 'Champs requis', description: 'Le nom et l\'URL sont obligatoires.', variant: 'destructive' })
-      return
-    }
+    if (!formData.name.trim() || !formData.url.trim()) { toast({ title: 'Champs requis', description: 'Nom et URL obligatoires.', variant: 'destructive' }); return }
     let url = formData.url.trim()
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'https://' + url
-    }
-    if (editingApp) {
-      setApps((prev) =>
-        prev.map((a) =>
-          a.id === editingApp.id
-            ? { ...a, ...formData, url, updatedAt: new Date().toISOString() }
-            : a
-        )
-      )
-      toast({ title: 'Application modifiee', description: `${formData.name} a ete mis a jour.` })
-    } else {
-      const newApp: AppItem = {
-        id: generateId(),
-        name: formData.name.trim(),
-        url,
-        description: formData.description.trim() || null,
-        category: formData.category,
-        color: formData.color,
-        icon: formData.icon,
-        order: apps.length,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        source: 'manual',
-      }
-      setApps((prev) => [...prev, newApp])
-      toast({ title: 'Application ajoutee', description: `${formData.name} a ete ajoute.` })
-    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url
+    if (editingApp) { setApps((p) => p.map((a) => a.id === editingApp.id ? { ...a, ...formData, url, updatedAt: new Date().toISOString() } : a)); toast({ title: 'Modifiee', description: `${formData.name} mis a jour.` }) }
+    else { setApps((p) => [...p, { id: generateId(), name: formData.name.trim(), url, description: formData.description.trim() || null, category: formData.category, color: formData.color, icon: formData.icon, order: apps.length, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'manual' }]); toast({ title: 'Ajoutee', description: `${formData.name} ajoute.` }) }
     setDialogOpen(false)
   }
+  const handleDelete = () => { if (!deletingApp) return; setApps((p) => p.filter((a) => a.id !== deletingApp.id)); toast({ title: 'Supprimee', description: `${deletingApp.name} supprime.` }); setDeleteDialogOpen(false); setDeletingApp(null) }
+  const getIcon = (n: string): LucideIcon => iconMap[n] || Link2
 
-  const handleDelete = () => {
-    if (!deletingApp) return
-    setApps((prev) => prev.filter((a) => a.id !== deletingApp.id))
-    toast({ title: 'Supprime', description: `${deletingApp.name} a ete supprime.` })
-    setDeleteDialogOpen(false)
-    setDeletingApp(null)
-  }
-
-  const getIcon = (iconName: string): LucideIcon => {
-    return iconMap[iconName] || Link2
-  }
-
-  const sourceBadge = (source: AppItem['source']) => {
-    if (source === 'github') return <Badge variant='outline' className='text-[10px] px-1.5 py-0 border-slate-300 dark:border-slate-600 gap-1'><Github className='h-3 w-3' />GitHub</Badge>
-    if (source === 'vercel') return <Badge variant='outline' className='text-[10px] px-1.5 py-0 border-slate-300 dark:border-slate-600 gap-1'><Zap className='h-3 w-3' />Vercel</Badge>
-    return null
-  }
-
-  // Skeleton / loading before mount
+  // ---- SKELETON ----
   if (!mounted) {
     return (
-      <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
-        <header className="border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-slate-200 dark:bg-slate-700 animate-pulse" />
-              <div className="h-6 w-40 rounded bg-slate-200 dark:bg-slate-700 animate-pulse" />
-            </div>
-            <div className="flex gap-2">
-              <div className="h-9 w-9 rounded-lg bg-slate-200 dark:bg-slate-700 animate-pulse" />
-              <div className="h-9 w-32 rounded-lg bg-slate-200 dark:bg-slate-700 animate-pulse" />
-            </div>
-          </div>
-        </header>
-        <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-40 rounded-xl bg-white dark:bg-slate-800 shadow-sm animate-pulse" />
-            ))}
-          </div>
-        </main>
+      <div className="min-h-[100dvh] bg-[var(--background)]">
+        <div className="h-14" style={{ paddingTop: 'var(--safe-top)' }} />
+        <div className="px-4 pt-4 pb-2"><div className="h-7 w-48 rounded-full bg-[var(--muted)] animate-pulse" /></div>
+        <div className="px-4 pt-2"><div className="h-10 rounded-2xl bg-[var(--muted)] animate-pulse" /></div>
+        <div className="px-4 pt-6 space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (<div key={i} className="h-[72px] rounded-2xl bg-[var(--card)] animate-pulse" />))}
+        </div>
       </div>
     )
   }
 
+  // ---- MAIN UI ----
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
-      {/* Header */}
-      <header className="border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-lg shadow-violet-200 dark:shadow-violet-900/30">
-              <Github className="h-5 w-5" />
+    <div className="min-h-[100dvh] bg-[var(--background)] flex flex-col" style={{ paddingTop: 'var(--safe-top)', paddingBottom: 'var(--safe-bottom)', paddingLeft: 'var(--safe-left)', paddingRight: 'var(--safe-right)' }}>
+
+      {/* ---- HEADER ---- */}
+      <header className="sticky top-0 z-30 bg-[var(--background)]/80 backdrop-blur-xl backdrop-saturate-180% border-b border-[var(--border)]">
+        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#6e40c9] to-[#a855f7] flex items-center justify-center shadow-sm">
+              <Github className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                GitHub App Manager
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
-                Centralisez et accedez a vos applications
-              </p>
+              <h1 className="text-[17px] font-semibold tracking-tight text-[var(--foreground)] leading-none">App Manager</h1>
+              <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">{apps.length} application{apps.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 relative"
-                  onClick={() => setSettingsDialogOpen(true)}
-                >
-                  <Key className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Parametres de synchro</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9"
-                  onClick={doSync}
-                  disabled={syncing || (!settings.githubUsername && !settings.vercelToken)}
-                >
-                  <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {syncing ? 'Synchronisation...' : 'Synchroniser maintenant'}
-              </TooltipContent>
-            </Tooltip>
-            <Button
-              onClick={openCreateDialog}
-              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg shadow-violet-200 dark:shadow-violet-900/30 transition-all duration-200 hover:scale-[1.02]"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Ajouter</span>
-            </Button>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setShowSearch(!showSearch)} className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-[var(--secondary)] transition-colors">
+              {showSearch ? <X className="h-[18px] w-[18px] text-[var(--foreground)]" /> : <Search className="h-[18px] w-[18px] text-[var(--foreground)]" />}
+            </button>
+            <button onClick={() => setSettingsDialogOpen(true)} className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-[var(--secondary)] transition-colors">
+              <Key className="h-[18px] w-[18px] text-[var(--foreground)]" />
+            </button>
+            <button onClick={doSync} disabled={syncing} className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-[var(--secondary)] transition-colors disabled:opacity-40">
+              <RefreshCw className={`h-[18px] w-[18px] text-[var(--foreground)] ${syncing ? 'animate-spin' : ''}`} />
+            </button>
+            <button onClick={openCreateDialog} className="h-9 w-9 flex items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm active:scale-95 transition-transform">
+              <Plus className="h-[18px] w-[18px]" />
+            </button>
           </div>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
-        {/* Stats Bar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <LayoutGrid className="h-4 w-4 text-slate-400" />
-              <span className="text-sm text-slate-500 dark:text-slate-400">
-                {filteredApps.length} application{filteredApps.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-            {lastSync && (
-              <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                Derniere synchro : {lastSync}
-              </span>
-            )}
-            {filterCategory !== 'all' && (
-              <Badge variant="secondary" className="text-xs">{filterCategory}</Badge>
-            )}
-            {filterSource !== 'all' && (
-              <Badge variant="secondary" className="text-xs">
-                {filterSource === 'github' ? 'GitHub Pages' : filterSource === 'vercel' ? 'Vercel' : 'Manuel'}
-              </Badge>
-            )}
-          </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-56">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+        {/* Search bar */}
+        {showSearch && (
+          <div className="max-w-3xl mx-auto px-4 pb-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted-foreground)]" />
               <Input
                 placeholder="Rechercher..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                className="pl-9 h-10 rounded-xl bg-[var(--card)] border-[var(--border)] text-[15px]"
+                autoFocus
               />
-              {search && (
-                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
             </div>
-            <Select value={filterSource} onValueChange={setFilterSource}>
-              <SelectTrigger className="w-full sm:w-36 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                <SelectValue placeholder="Source" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes sources</SelectItem>
-                <SelectItem value="github">GitHub Pages</SelectItem>
-                <SelectItem value="vercel">Vercel</SelectItem>
-                <SelectItem value="manual">Manuel</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="w-full sm:w-36 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                <SelectValue placeholder="Categorie" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat === 'all' ? 'Toutes' : cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
+        )}
+      </header>
+
+      {/* ---- FILTER PILLS ---- */}
+      <div className="max-w-3xl mx-auto w-full px-4 pt-3 pb-1">
+        <div className="flex gap-2 overflow-x-auto ios-scroll scrollbar-none -mx-4 px-4 pb-1">
+          <button onClick={() => { setFilterSource('all'); setFilterCategory('all') }} className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors ${filterSource === 'all' && filterCategory === 'all' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)]'}`}>
+            Toutes ({apps.length})
+          </button>
+          <button onClick={() => setFilterSource('github')} className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors flex items-center gap-1.5 ${filterSource === 'github' ? 'bg-[#24292e] text-white' : 'bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)]'}`}>
+            <Github className="h-3.5 w-3.5" />GitHub ({ghCount})
+          </button>
+          <button onClick={() => setFilterSource('vercel')} className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors flex items-center gap-1.5 ${filterSource === 'vercel' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)]'}`}>
+            <Zap className="h-3.5 w-3.5" />Vercel ({vcCount})
+          </button>
+          {mnCount > 0 && (
+            <button onClick={() => setFilterSource('manual')} className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors ${filterSource === 'manual' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)]'}`}>
+              Manuel ({mnCount})
+            </button>
+          )}
         </div>
+        {lastSync && <p className="text-[11px] text-[var(--muted-foreground)] mt-1.5">Derniere synchro : {lastSync}</p>}
+      </div>
 
-        {/* Empty state when no settings configured */}
+      {/* ---- CONTENT ---- */}
+      <main className="flex-1 max-w-3xl mx-auto w-full px-4 pt-2 pb-24 ios-scroll">
+
+        {/* Empty states */}
         {apps.length === 0 && !settings.githubUsername && !settings.vercelToken && (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="flex items-center justify-center h-20 w-20 rounded-2xl bg-violet-50 dark:bg-violet-950/30 mb-6">
-              <Key className="h-10 w-10 text-violet-400" />
+          <div className="flex flex-col items-center justify-center py-24 text-center px-6">
+            <div className="h-16 w-16 rounded-full bg-[var(--secondary)] flex items-center justify-center mb-5">
+              <Key className="h-7 w-7 text-[var(--muted-foreground)]" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-              Configurez la synchronisation
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6">
-              Entrez votre nom d&apos;utilisateur GitHub et/ou votre token Vercel pour synchroniser automatiquement toutes vos applications déployées.
-            </p>
-            <Button
-              onClick={() => setSettingsDialogOpen(true)}
-              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white"
-            >
-              <Key className="h-4 w-4 mr-2" />
-              Configurer
-            </Button>
+            <h3 className="text-[17px] font-semibold mb-1.5">Configuration requise</h3>
+            <p className="text-[15px] text-[var(--muted-foreground)] max-w-[260px] mb-6 leading-relaxed">Connectez vos comptes GitHub et Vercel pour synchroniser vos applications.</p>
+            <Button onClick={() => setSettingsDialogOpen(true)} className="rounded-full px-6 h-11 text-[15px] font-medium">Configurer</Button>
           </div>
         )}
 
-        {/* App Grid */}
-        {filteredApps.length === 0 && (settings.githubUsername || settings.vercelToken) && (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="flex items-center justify-center h-20 w-20 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-6">
-              <Github className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+        {filteredApps.length === 0 && apps.length > 0 && (
+          <div className="flex flex-col items-center justify-center py-24 text-center px-6">
+            <div className="h-16 w-16 rounded-full bg-[var(--secondary)] flex items-center justify-center mb-5">
+              <Search className="h-7 w-7 text-[var(--muted-foreground)]" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-              {search || filterCategory !== 'all' || filterSource !== 'all'
-                ? 'Aucun resultat'
-                : 'Aucune application'}
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6">
-              {search || filterCategory !== 'all' || filterSource !== 'all'
-                ? 'Essayez de modifier vos filtres.'
-                : 'Aucune application trouvee. Ajoutez-en manuellement ou attendez la synchro.'}
-            </p>
+            <h3 className="text-[17px] font-semibold mb-1.5">Aucun resultat</h3>
+            <p className="text-[15px] text-[var(--muted-foreground)]">Modifiez vos filtres ou votre recherche.</p>
           </div>
         )}
 
+        {/* ---- APP LIST ---- */}
         {filteredApps.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="space-y-2">
             {filteredApps.map((app) => {
-              const IconComponent = getIcon(app.icon)
               const isAuto = app.source === 'github' || app.source === 'vercel'
               return (
-                <div
-                  key={app.id}
-                  className={`group relative bg-white dark:bg-slate-800/80 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden ${
-                    isAuto
-                      ? 'border-slate-200/80 dark:border-slate-700/40'
-                      : 'border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600'
-                  }`}
-                >
-                  <div className="h-1 w-full" style={{ backgroundColor: app.color }} />
-                  <div className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <AppIcon name={app.name} url={app.url} fallbackIcon={IconComponent} color={app.color} />
-                        <div className="min-w-0">
-                          <h3 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
-                            {app.name}
-                          </h3>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            {sourceBadge(app.source)}
-                          </div>
-                        </div>
+                <div key={app.id} className="group bg-[var(--card)] rounded-2xl border border-[var(--border)] overflow-hidden active:scale-[0.98] transition-transform duration-150">
+                  <a href={app.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3.5 p-3.5">
+                    <AppIcon name={app.name} url={app.url} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-[15px] font-semibold text-[var(--foreground)] truncate">{app.name}</h3>
+                        {app.source === 'github' && <span className="shrink-0 text-[10px] font-medium text-[#24292e] bg-[#24292e]/10 px-1.5 py-0.5 rounded-md">GH</span>}
+                        {app.source === 'vercel' && <span className="shrink-0 text-[10px] font-medium text-[var(--foreground)] bg-[var(--secondary)] px-1.5 py-0.5 rounded-md">VC</span>}
                       </div>
+                      {app.description && <p className="text-[13px] text-[var(--muted-foreground)] truncate mt-0.5 leading-snug">{app.description}</p>}
+                      <p className="text-[11px] text-[var(--muted-foreground)]/60 font-mono truncate mt-0.5">{app.url}</p>
                     </div>
-
-                    {app.description && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-3">
-                        {app.description}
-                      </p>
-                    )}
-
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate mb-3 font-mono">
-                      {app.url}
-                    </p>
-
-                    <div className="flex items-center gap-1.5">
-                      <a href={app.url} target="_blank" rel="noopener noreferrer" className="flex-1">
-                        <Button
-                          size="sm"
-                          className="w-full text-xs bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-sm"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                          Ouvrir
-                        </Button>
-                      </a>
-                      {!isAuto && (
-                        <>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" onClick={() => openEditDialog(app)}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Modifier</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500 dark:hover:text-red-400" onClick={() => openDeleteDialog(app)}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Supprimer</TooltipContent>
-                          </Tooltip>
-                        </>
-                      )}
+                    <ChevronRight className="h-4 w-4 text-[var(--muted-foreground)]/40 shrink-0" />
+                  </a>
+                  {!isAuto && (
+                    <div className="flex border-t border-[var(--border)]">
+                      <button onClick={() => openEditDialog(app)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[13px] text-[var(--muted-foreground)] hover:bg-[var(--secondary)] transition-colors border-r border-[var(--border)]">
+                        <Pencil className="h-3.5 w-3.5" />Modifier
+                      </button>
+                      <button onClick={() => openDeleteDialog(app)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[13px] text-[var(--destructive)] hover:bg-[var(--destructive)]/10 transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" />Supprimer
+                      </button>
                     </div>
-                  </div>
+                  )}
                 </div>
               )
             })}
@@ -982,212 +396,119 @@ export default function Home() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="mt-auto border-t bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 text-center">
-          <p className="text-xs text-slate-400 dark:text-slate-500">
-            GitHub App Manager — Synchronisation automatique GitHub Pages & Vercel
-          </p>
-        </div>
-      </footer>
+      {/* ---- FLOATING ADD BUTTON (mobile) ---- */}
+      <div className="fixed bottom-6 right-6 z-20 sm:hidden" style={{ marginBottom: 'var(--safe-bottom)' }}>
+        <button
+          onClick={openCreateDialog}
+          className="h-14 w-14 rounded-full bg-[#6e40c9] text-white shadow-lg shadow-[#6e40c9]/30 flex items-center justify-center active:scale-90 transition-transform"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      </div>
 
-      {/* Settings Dialog */}
+      {/* ---- SETTINGS DIALOG ---- */}
       <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
-        <DialogContent className="sm:max-w-[480px]">
+        <DialogContent className="sm:max-w-[440px] rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5 text-violet-600" />
-              Parametres de synchronisation
-            </DialogTitle>
-            <DialogDescription>
-              Configurez vos comptes pour synchroniser automatiquement vos applications déployées.
-            </DialogDescription>
+            <DialogTitle className="text-[17px]">Synchronisation</DialogTitle>
+            <DialogDescription>Connectez vos comptes pour synchroniser automatiquement.</DialogDescription>
           </DialogHeader>
-
           <div className="grid gap-4 py-2">
-            {/* GitHub Username */}
-            <div className="grid gap-2">
-              <Label htmlFor="gh-username">Nom d&apos;utilisateur GitHub</Label>
-              <Input
-                id="gh-username"
-                placeholder="thieuquillabru"
-                value={settings.githubUsername}
-                onChange={(e) => setSettings({ ...settings, githubUsername: e.target.value })}
-              />
-              <p className="text-[11px] text-slate-400">Synchronisera tous les repos avec GitHub Pages activé.</p>
+            <div className="grid gap-1.5">
+              <Label htmlFor="gh-username" className="text-[13px]">Utilisateur GitHub</Label>
+              <Input id="gh-username" placeholder="thieuquillabru" value={settings.githubUsername} onChange={(e) => setSettings({ ...settings, githubUsername: e.target.value })} className="h-11 rounded-xl" />
             </div>
-
-            {/* GitHub Token (optional) */}
-            <div className="grid gap-2">
-              <Label htmlFor="gh-token">Token GitHub (optionnel)</Label>
-              <Input
-                id="gh-token"
-                type="password"
-                placeholder="ghp_xxxxxxxxxxxx"
-                value={settings.githubToken}
-                onChange={(e) => setSettings({ ...settings, githubToken: e.target.value })}
-              />
-              <p className="text-[11px] text-slate-400">Augmente la limite de requetes API. Stocké localement dans votre navigateur.</p>
+            <div className="grid gap-1.5">
+              <Label htmlFor="gh-token" className="text-[13px]">Token GitHub (optionnel)</Label>
+              <Input id="gh-token" type="password" placeholder="ghp_xxx" value={settings.githubToken} onChange={(e) => setSettings({ ...settings, githubToken: e.target.value })} className="h-11 rounded-xl" />
             </div>
-
-            {/* Vercel Token */}
-            <div className="grid gap-2">
-              <Label htmlFor="vc-token">Token Vercel</Label>
-              <Input
-                id="vc-token"
-                type="password"
-                placeholder="Vercel token"
-                value={settings.vercelToken}
-                onChange={(e) => setSettings({ ...settings, vercelToken: e.target.value })}
-              />
-              <p className="text-[11px] text-slate-400">
-                Créez un token sur{' '}
-                <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline">
-                  vercel.com/account/tokens
-                </a>
-              </p>
+            <div className="grid gap-1.5">
+              <Label htmlFor="vc-token" className="text-[13px]">Token Vercel</Label>
+              <Input id="vc-token" type="password" placeholder="vcp_xxx" value={settings.vercelToken} onChange={(e) => setSettings({ ...settings, vercelToken: e.target.value })} className="h-11 rounded-xl" />
             </div>
-
-            {/* Auto Sync Toggle */}
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <Label>Synchronisation automatique</Label>
-                <p className="text-[11px] text-slate-400">Synchro toutes les 5 minutes + au chargement</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSettings({ ...settings, autoSync: !settings.autoSync })}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 ${
-                  settings.autoSync ? 'bg-violet-600' : 'bg-slate-200 dark:bg-slate-700'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    settings.autoSync ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
+            <div className="flex items-center justify-between py-1">
+              <div><Label className="text-[13px]">Sync automatique</Label><p className="text-[11px] text-[var(--muted-foreground)]">Toutes les 5 min + au chargement</p></div>
+              <button type="button" onClick={() => setSettings({ ...settings, autoSync: !settings.autoSync })} className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${settings.autoSync ? 'bg-[#6e40c9]' : 'bg-[var(--muted)]'}`}>
+                <span className={`pointer-events-none inline-block h-5.5 w-5.5 translate-y-0.5 rounded-full bg-white shadow-md transition duration-200 ${settings.autoSync ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
               </button>
             </div>
           </div>
-
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setSettingsDialogOpen(false)}>
-              Fermer
-            </Button>
-            <Button
-              onClick={() => {
-                setSettingsDialogOpen(false)
-                setTimeout(doSync, 300)
-              }}
-              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Enregistrer & Sync
+            <Button variant="outline" onClick={() => setSettingsDialogOpen(false)} className="rounded-full h-11 flex-1">Fermer</Button>
+            <Button onClick={() => { setSettingsDialogOpen(false); setTimeout(doSync, 300) }} className="rounded-full h-11 flex-1 bg-[#6e40c9] hover:bg-[#5b2da0] text-white">
+              <RefreshCw className="h-4 w-4 mr-1.5" />Sync
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Add/Edit Dialog */}
+      {/* ---- ADD/EDIT DIALOG ---- */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[460px] max-h-[85vh] overflow-y-auto ios-scroll rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {editingApp ? (
-                <><Pencil className="h-5 w-5 text-violet-600" />Modifier l&apos;application</>
-              ) : (
-                <><Plus className="h-5 w-5 text-violet-600" />Nouvelle application</>
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              {editingApp ? 'Modifiez les informations.' : 'Ajoutez une application manuellement.'}
-            </DialogDescription>
+            <DialogTitle className="text-[17px]">{editingApp ? 'Modifier' : 'Nouvelle application'}</DialogTitle>
+            <DialogDescription>{editingApp ? 'Modifiez les informations.' : 'Ajoutez une application.'}</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="grid gap-2">
-              <Label htmlFor="app-name">Nom <span className="text-red-500">*</span></Label>
-              <Input id="app-name" placeholder="Mon Application" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+          <div className="grid gap-3.5 py-1">
+            <div className="grid gap-1.5">
+              <Label className="text-[13px]">Nom *</Label>
+              <Input placeholder="Mon Application" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="h-11 rounded-xl" />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="app-url">URL <span className="text-red-500">*</span></Label>
-              <Input id="app-url" placeholder="https://username.github.io/my-app" value={formData.url} onChange={(e) => setFormData({ ...formData, url: e.target.value })} />
+            <div className="grid gap-1.5">
+              <Label className="text-[13px]">URL *</Label>
+              <Input placeholder="https://example.com" value={formData.url} onChange={(e) => setFormData({ ...formData, url: e.target.value })} className="h-11 rounded-xl" />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="app-desc">Description</Label>
-              <Textarea id="app-desc" placeholder="Decrivez votre application..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} />
+            <div className="grid gap-1.5">
+              <Label className="text-[13px]">Description</Label>
+              <Textarea placeholder="Decrivez l'application..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} className="rounded-xl" />
             </div>
-            <div className="grid gap-2">
-              <Label>Categorie</Label>
+            <div className="grid gap-1.5">
+              <Label className="text-[13px]">Categorie</Label>
               <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
-                <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                <SelectContent>
-                  {categoryPresets.map((cat) => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}
-                </SelectContent>
+                <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>{categoryPresets.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="grid gap-2">
-              <Label>Icone</Label>
+            <div className="grid gap-1.5">
+              <Label className="text-[13px]">Icone</Label>
               <div className="grid grid-cols-6 gap-2">
-                {iconOptions.map((iconName) => {
-                  const Ic = iconMap[iconName]
-                  return (
-                    <button key={iconName} type="button" onClick={() => setFormData({ ...formData, icon: iconName })}
-                      className={`flex items-center justify-center h-10 w-full rounded-lg border-2 transition-all duration-150 ${
-                        formData.icon === iconName
-                          ? 'border-violet-600 bg-violet-50 dark:bg-violet-950/30 text-violet-600'
-                          : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-500 dark:text-slate-400'
-                      }`}
-                    >
-                      <Ic className="h-4 w-4" />
-                    </button>
-                  )
-                })}
+                {iconOptions.map((iconName) => { const Ic = iconMap[iconName]; return (
+                  <button key={iconName} type="button" onClick={() => setFormData({ ...formData, icon: iconName })} className={`flex items-center justify-center h-11 w-full rounded-xl border-2 transition-all ${formData.icon === iconName ? 'border-[#6e40c9] bg-[#6e40c9]/10 text-[#6e40c9]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}>
+                    <Ic className="h-4 w-4" />
+                  </button>
+                )})}
               </div>
             </div>
-            <div className="grid gap-2">
-              <Label>Couleur</Label>
-              <div className="flex flex-wrap gap-2">
+            <div className="grid gap-1.5">
+              <Label className="text-[13px]">Couleur</Label>
+              <div className="flex flex-wrap gap-2.5">
                 {colorOptions.map((color) => (
-                  <button key={color} type="button" onClick={() => setFormData({ ...formData, color })}
-                    className={`h-8 w-8 rounded-full border-2 transition-all duration-150 flex items-center justify-center ${
-                      formData.color === color ? 'border-slate-900 dark:border-white scale-110' : 'border-transparent hover:scale-105'
-                    }`}
-                    style={{ backgroundColor: color }}
-                  >
-                    {formData.color === color && <Check className="h-4 w-4 text-white" />}
+                  <button key={color} type="button" onClick={() => setFormData({ ...formData, color })} className={`h-9 w-9 rounded-full border-2 transition-all flex items-center justify-center ${formData.color === color ? 'border-[var(--foreground)] scale-110' : 'border-transparent'}`} style={{ backgroundColor: color }}>
+                    {formData.color === color && <Check className="h-3.5 w-3.5 text-white" />}
                   </button>
                 ))}
               </div>
             </div>
           </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-            <Button onClick={handleSubmit} className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white">
-              {editingApp ? 'Enregistrer' : 'Ajouter'}
-            </Button>
+          <DialogFooter className="gap-2 pt-1">
+            <Button variant="outline" onClick={() => setDialogOpen(false)} className="rounded-full h-11 flex-1">Annuler</Button>
+            <Button onClick={handleSubmit} className="rounded-full h-11 flex-1 bg-[#6e40c9] hover:bg-[#5b2da0] text-white">{editingApp ? 'Enregistrer' : 'Ajouter'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
+      {/* ---- DELETE DIALOG ---- */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-red-500" />
-              Supprimer cette application ?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Cette action est irreversible. L&apos;application{' '}
-              <span className="font-semibold text-slate-900 dark:text-white">{deletingApp?.name}</span>{' '}
-              sera definitivement supprimee.
+            <AlertDialogTitle className="text-[17px]">Supprimer ?</AlertDialogTitle>
+            <AlertDialogDescription className="text-[15px] leading-relaxed">
+              <span className="font-semibold">{deletingApp?.name}</span> sera definitivement supprime.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
-              Supprimer
-            </AlertDialogAction>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-full h-11 flex-1">Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="rounded-full h-11 flex-1 bg-[var(--destructive)] hover:opacity-90 text-white">Supprimer</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
