@@ -9,7 +9,6 @@ import {
   Search,
   Github,
   LayoutGrid,
-  GripVertical,
   X,
   Check,
   Link2,
@@ -124,6 +123,8 @@ interface AppItem {
   updatedAt: string
 }
 
+const STORAGE_KEY = 'github-app-manager-apps'
+
 const defaultFormData = {
   name: '',
   url: '',
@@ -133,9 +134,28 @@ const defaultFormData = {
   icon: 'Link',
 }
 
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 9)
+}
+
+function loadApps(): AppItem[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveApps(apps: AppItem[]): void {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(apps))
+}
+
 export default function Home() {
   const [apps, setApps] = useState<AppItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -143,29 +163,20 @@ export default function Home() {
   const [editingApp, setEditingApp] = useState<AppItem | null>(null)
   const [deletingApp, setDeletingApp] = useState<AppItem | null>(null)
   const [formData, setFormData] = useState(defaultFormData)
-  const [submitting, setSubmitting] = useState(false)
   const { toast } = useToast()
 
-  const fetchApps = useCallback(async () => {
-    try {
-      const res = await fetch('/api/apps')
-      if (!res.ok) throw new Error('Failed to fetch')
-      const data = await res.json()
-      setApps(data)
-    } catch {
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de charger les applications.',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [toast])
-
+  // Load from localStorage on mount
   useEffect(() => {
-    fetchApps()
-  }, [fetchApps])
+    setApps(loadApps())
+    setMounted(true)
+  }, [])
+
+  // Persist to localStorage whenever apps change
+  useEffect(() => {
+    if (mounted) {
+      saveApps(apps)
+    }
+  }, [apps, mounted])
 
   // Get unique categories from apps
   const categories = ['all', ...Array.from(new Set(apps.map((a) => a.category)))]
@@ -204,7 +215,7 @@ export default function Home() {
     setDeleteDialogOpen(true)
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!formData.name.trim() || !formData.url.trim()) {
       toast({
         title: 'Champs requis',
@@ -214,68 +225,54 @@ export default function Home() {
       return
     }
 
-    setSubmitting(true)
-    try {
-      let url = formData.url.trim()
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url
-      }
-
-      if (editingApp) {
-        const res = await fetch(`/api/apps/${editingApp.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...formData, url }),
-        })
-        if (!res.ok) throw new Error('Failed to update')
-        toast({ title: 'Application modifiee', description: `${formData.name} a ete mis a jour.` })
-      } else {
-        const res = await fetch('/api/apps', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...formData, url }),
-        })
-        if (!res.ok) throw new Error('Failed to create')
-        toast({ title: 'Application ajoutee', description: `${formData.name} a ete ajoute.` })
-      }
-
-      setDialogOpen(false)
-      fetchApps()
-    } catch {
-      toast({
-        title: 'Erreur',
-        description: editingApp ? 'Impossible de modifier l\'application.' : 'Impossible d\'ajouter l\'application.',
-        variant: 'destructive',
-      })
-    } finally {
-      setSubmitting(false)
+    let url = formData.url.trim()
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url
     }
+
+    if (editingApp) {
+      setApps((prev) =>
+        prev.map((a) =>
+          a.id === editingApp.id
+            ? { ...a, ...formData, url, updatedAt: new Date().toISOString() }
+            : a
+        )
+      )
+      toast({ title: 'Application modifiee', description: `${formData.name} a ete mis a jour.` })
+    } else {
+      const newApp: AppItem = {
+        id: generateId(),
+        name: formData.name.trim(),
+        url,
+        description: formData.description.trim() || null,
+        category: formData.category,
+        color: formData.color,
+        icon: formData.icon,
+        order: apps.length,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      setApps((prev) => [...prev, newApp])
+      toast({ title: 'Application ajoutee', description: `${formData.name} a ete ajoute.` })
+    }
+
+    setDialogOpen(false)
   }
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!deletingApp) return
-    try {
-      const res = await fetch(`/api/apps/${deletingApp.id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete')
-      toast({ title: 'Supprime', description: `${deletingApp.name} a ete supprime.` })
-      setDeleteDialogOpen(false)
-      setDeletingApp(null)
-      fetchApps()
-    } catch {
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de supprimer l\'application.',
-        variant: 'destructive',
-      })
-    }
+    setApps((prev) => prev.filter((a) => a.id !== deletingApp.id))
+    toast({ title: 'Supprime', description: `${deletingApp.name} a ete supprime.` })
+    setDeleteDialogOpen(false)
+    setDeletingApp(null)
   }
 
   const getIcon = (iconName: string): LucideIcon => {
     return iconMap[iconName] || Link2
   }
 
-  // Skeleton loading
-  if (loading) {
+  // Prevent flash of empty state before localStorage loads
+  if (!mounted) {
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
         <header className="border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
@@ -647,25 +644,14 @@ export default function Home() {
             <Button
               variant="outline"
               onClick={() => setDialogOpen(false)}
-              disabled={submitting}
             >
               Annuler
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitting}
               className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white"
             >
-              {submitting ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Enregistrement...
-                </span>
-              ) : editingApp ? (
-                'Enregistrer'
-              ) : (
-                'Ajouter'
-              )}
+              {editingApp ? 'Enregistrer' : 'Ajouter'}
             </Button>
           </DialogFooter>
         </DialogContent>

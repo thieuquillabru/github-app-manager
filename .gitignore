@@ -36,6 +36,18 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Database
+/prisma/
+/db/
+*.db
+*.db-journal
+
+# Z.ai internal
+.zscripts/
+scripts/
+worklog.md
+/skills/
+tool-results/
 
 # typescript
 *.tsbuildinfo
