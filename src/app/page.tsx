@@ -393,21 +393,28 @@ async function fetchVercelProjects(token: string): Promise<Omit<AppItem, 'order'
   return apps
 }
 
-function getFaviconUrl(url: string): string {
+function getFaviconUrls(url: string): string[] {
   try {
-    const domain = new URL(url).hostname
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+    const parsed = new URL(url)
+    const origin = parsed.origin
+    const domain = parsed.hostname
+    return [
+      `${origin}/favicon.ico`,
+      `https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${origin}&size=64`,
+      `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
+    ]
   } catch {
-    return ''
+    return []
   }
 }
 
 function FaviconIcon({ url, fallbackIcon, color }: { url: string; fallbackIcon: LucideIcon; color: string }) {
   const FallbackIcon = fallbackIcon
-  const [imgError, setImgError] = useState(false)
-  const faviconUrl = getFaviconUrl(url)
+  const [currentIdx, setCurrentIdx] = useState(0)
+  const [allFailed, setAllFailed] = useState(false)
+  const urls = getFaviconUrls(url)
 
-  if (!faviconUrl || imgError) {
+  if (urls.length === 0 || allFailed) {
     return (
       <div
         className="flex items-center justify-center h-12 w-12 rounded-xl text-white shrink-0 shadow-sm"
@@ -419,12 +426,19 @@ function FaviconIcon({ url, fallbackIcon, color }: { url: string; fallbackIcon: 
   }
 
   return (
-    <div className="h-12 w-12 rounded-xl shrink-0 shadow-sm overflow-hidden bg-slate-100 dark:bg-slate-700 p-1.5 flex items-center justify-center">
+    <div className="h-12 w-12 rounded-xl shrink-0 shadow-sm overflow-hidden bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center">
       <img
-        src={faviconUrl}
+        src={urls[currentIdx]}
         alt=""
-        className="w-full h-full object-contain rounded"
-        onError={() => setImgError(true)}
+        className="w-8 h-8 object-contain"
+        onError={() => {
+          const next = currentIdx + 1
+          if (next < urls.length) {
+            setCurrentIdx(next)
+          } else {
+            setAllFailed(true)
+          }
+        }}
       />
     </div>
   )
