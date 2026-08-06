@@ -123,10 +123,15 @@ async function fetchVercelProjects(token: string): Promise<Omit<AppItem, 'order'
       for (const project of data.projects) {
         const prodTarget = project.targets?.production
         const aliases: string[] = prodTarget?.alias || []
-        const cleanAlias = aliases.find((a: string) => /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(a) && !a.includes('git-') && !a.includes('-thieuquillabrus-'))
-        const fallbackAlias = aliases.find((a: string) => /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(a))
-        const url = cleanAlias || fallbackAlias || prodTarget?.url || `https://${project.name}.vercel.app`
+        const isCleanUrl = (a: string) => /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(a) && !a.includes('git-') && !a.includes('-thieuquillabrus-') && !a.includes('-projects')
+        const cleanAlias = aliases.find(isCleanUrl)
+        const fallbackAlias = aliases.find((a: string) => /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(a) && !a.includes('git-') && !a.includes('-thieuquillabrus-'))
+        let url = cleanAlias || fallbackAlias || `https://${project.name}.vercel.app`
+        if (url && !url.startsWith('https://')) url = 'https://' + url
         apps.push({ id: `vercel-${project.id}`, name: project.name, url, description: project.description || null, category: 'Vercel', color: VERCEL_COLOR, icon: 'Zap', source: 'vercel' as const, repoName: project.name })
+        // Override with known working URLs from BUNDLED_APPS for reliability
+        const knownOverride = BUNDLED_APPS.find(b => b.source === 'vercel' && b.repoName === project.name)
+        if (knownOverride) apps[apps.length - 1].url = knownOverride.url
       }
     }
   } catch { /* Vercel API error */ }
@@ -177,7 +182,22 @@ export default function Home() {
     const envGhToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN || ''
     const envVcToken = process.env.NEXT_PUBLIC_VERCEL_TOKEN || ''
     const effectiveSettings: SyncSettings = { ...storedSettings, githubToken: storedSettings.githubToken || envGhToken, vercelToken: storedSettings.vercelToken || envVcToken }
-    if (stored.length === 0) { setApps(BUNDLED_APPS); saveToStorage(APPS_KEY, BUNDLED_APPS) } else { setApps(stored) }
+    if (stored.length === 0) { setApps(BUNDLED_APPS); saveToStorage(APPS_KEY, BUNDLED_APPS) } else {
+      // Fix broken URLs: missing https, or Vercel deployment URLs replaced by known good BUNDLED_APPS URLs
+      let changed = false
+      const fixed = stored.map(app => {
+        let url = app.url
+        if (url && !url.startsWith('http')) { url = 'https://' + url; changed = true }
+        // Replace bad Vercel deployment URLs with known working URLs from BUNDLED_APPS
+        if (app.source === 'vercel' && (url.includes('-projects.vercel.app') || url.includes('-thieuquillabrus-'))) {
+          const known = BUNDLED_APPS.find(b => b.source === 'vercel' && b.repoName === app.repoName)
+          if (known && known.url !== url) { url = known.url; changed = true }
+        }
+        return changed ? { ...app, url } : app
+      })
+      setApps(fixed)
+      if (changed) saveToStorage(APPS_KEY, fixed)
+    }
     setSettings(effectiveSettings)
     const savedSync = localStorage.getItem('github-app-manager-last-sync')
     if (savedSync) setLastSync(savedSync)
