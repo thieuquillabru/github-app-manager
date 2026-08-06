@@ -26,8 +26,8 @@ export const metadata: Metadata = {
   title: "App Manager",
   description: "Centralisez et accédez à toutes vos applications déployées.",
   icons: {
-    icon: '/favicon.svg',
-    apple: '/apple-touch-icon.png',
+    icon: '/github-app-manager/favicon.svg',
+    apple: '/github-app-manager/apple-touch-icon.png',
   },
   appleWebApp: {
     capable: true,
