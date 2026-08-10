@@ -1,0 +1,27 @@
+{
+  "name": "App Manager",
+  "short_name": "Apps",
+  "description": "Centralisez et accédez à toutes vos applications déployées.",
+  "start_url": "/github-app-manager/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#0f0f0f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/github-app-manager/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/github-app-manager/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/github-app-manager/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

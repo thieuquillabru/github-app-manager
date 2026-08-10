@@ -25,8 +25,13 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "App Manager",
   description: "Centralisez et accédez à toutes vos applications déployées.",
+  manifest: '/github-app-manager/manifest.webmanifest',
   icons: {
-    icon: '/github-app-manager/favicon.svg',
+    icon: [
+      { url: '/github-app-manager/favicon.ico', sizes: '48x48' },
+      { url: '/github-app-manager/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/github-app-manager/favicon.svg', type: 'image/svg+xml' },
+    ],
     apple: '/github-app-manager/apple-touch-icon.png',
   },
   appleWebApp: {
