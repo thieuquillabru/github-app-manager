@@ -24,8 +24,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 const iconMap: Record<string, LucideIcon> = {
   Link: Link2, Globe: Globe, Code: Code2, Database: Database, Server: Server,
@@ -144,11 +144,26 @@ function stringToHue(str: string): number {
  return Math.abs(hash) % 360
 }
 
-function AppIcon({ name, url }: { name: string; url: string }) {
+function AppIcon({ name, icon, color }: { name: string; icon?: string; color?: string }) {
+  // Honor the user's chosen icon + color when available; otherwise fall back
+  // to a deterministic letter avatar derived from the app name.
+  const Ic = icon ? iconMap[icon] : undefined
+  if (Ic && color) {
+    return (
+      <div
+        aria-hidden="true"
+        className="flex items-center justify-center h-11 w-11 rounded-2xl text-white shrink-0 select-none"
+        style={{ background: `linear-gradient(145deg, ${color}, ${color}cc)` }}
+      >
+        <Ic className="h-[18px] w-[18px] drop-shadow-sm" />
+      </div>
+    )
+  }
   const letter = (name || '?')[0].toUpperCase()
   const hue = stringToHue(name)
   return (
     <div
+      aria-hidden="true"
       className="flex items-center justify-center h-11 w-11 rounded-2xl text-white shrink-0 select-none"
       style={{ background: `linear-gradient(145deg, hsl(${hue}, 65%, 48%), hsl(${(hue + 35) % 360}, 70%, 58%))` }}
     >
@@ -176,6 +191,10 @@ export default function Home() {
   const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { toast } = useToast()
 
+  /* eslint-disable react-hooks/set-state-in-effect */
+  // One-time client-only hydration sync from localStorage. The `mounted`
+  // guard + skeleton render keep server and first client render identical, so
+  // this is the correct hydration-safe pattern (not a cascading-render bug).
   useEffect(() => {
     const stored = loadFromStorage<AppItem[]>(APPS_KEY, [])
     const storedSettings = loadFromStorage(SETTINGS_KEY, defaultSettings)
@@ -203,6 +222,7 @@ export default function Home() {
     if (savedSync) setLastSync(savedSync)
     setMounted(true)
   }, [])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => { if (mounted) saveToStorage(APPS_KEY, apps) }, [apps, mounted])
   useEffect(() => { if (mounted) saveToStorage(SETTINGS_KEY, settings) }, [settings, mounted])
@@ -233,8 +253,8 @@ export default function Home() {
       if (syncedApps.length > 0) parts.push(`${syncedApps.length} app(s)`)
       if (addedCount > 0) parts.push(`+${addedCount}`)
       if (removedCount > 0) parts.push(`-${removedCount}`)
-      toast({ title: 'Synchronise', description: parts.join(', ') || 'Aucune application.' })
-    } catch { toast({ title: 'Erreur', description: 'Echec de la synchronisation.', variant: 'destructive' }) } finally { setSyncing(false) }
+      toast({ title: 'Synchronisé', description: parts.join(', ') || 'Aucune application.' })
+    } catch { toast({ title: 'Erreur', description: 'Échec de la synchronisation.', variant: 'destructive' }) } finally { setSyncing(false) }
   }, [settings, toast])
 
   useEffect(() => {
@@ -261,11 +281,11 @@ export default function Home() {
     if (!formData.name.trim() || !formData.url.trim()) { toast({ title: 'Champs requis', description: 'Nom et URL obligatoires.', variant: 'destructive' }); return }
     let url = formData.url.trim()
     if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url
-    if (editingApp) { setApps((p) => p.map((a) => a.id === editingApp.id ? { ...a, ...formData, url, updatedAt: new Date().toISOString() } : a)); toast({ title: 'Modifiee', description: `${formData.name} mis a jour.` }) }
-    else { setApps((p) => [...p, { id: generateId(), name: formData.name.trim(), url, description: formData.description.trim() || null, category: formData.category, color: formData.color, icon: formData.icon, order: apps.length, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'manual' }]); toast({ title: 'Ajoutee', description: `${formData.name} ajoute.` }) }
+    if (editingApp) { setApps((p) => p.map((a) => a.id === editingApp.id ? { ...a, ...formData, url, updatedAt: new Date().toISOString() } : a)); toast({ title: 'Modifiée', description: `${formData.name} mis à jour.` }) }
+    else { setApps((p) => [...p, { id: generateId(), name: formData.name.trim(), url, description: formData.description.trim() || null, category: formData.category, color: formData.color, icon: formData.icon, order: apps.length, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'manual' }]); toast({ title: 'Ajoutée', description: `${formData.name} ajouté.` }) }
     setDialogOpen(false)
   }
-  const handleDelete = () => { if (!deletingApp) return; setApps((p) => p.filter((a) => a.id !== deletingApp.id)); toast({ title: 'Supprimee', description: `${deletingApp.name} supprime.` }); setDeleteDialogOpen(false); setDeletingApp(null) }
+  const handleDelete = () => { if (!deletingApp) return; setApps((p) => p.filter((a) => a.id !== deletingApp.id)); toast({ title: 'Supprimée', description: `${deletingApp.name} supprimé.` }); setDeleteDialogOpen(false); setDeletingApp(null) }
   const getIcon = (n: string): LucideIcon => iconMap[n] || Link2
 
   // ---- SKELETON ----
@@ -299,16 +319,17 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <button onClick={() => setShowSearch(!showSearch)} className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-[var(--secondary)] transition-colors">
+            <button onClick={() => setShowSearch(!showSearch)} aria-label={showSearch ? 'Fermer la recherche' : 'Rechercher'} aria-expanded={showSearch} className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-[var(--secondary)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]">
               {showSearch ? <X className="h-[18px] w-[18px] text-[var(--foreground)]" /> : <Search className="h-[18px] w-[18px] text-[var(--foreground)]" />}
             </button>
-            <button onClick={() => setSettingsDialogOpen(true)} className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-[var(--secondary)] transition-colors">
+            <ThemeToggle />
+            <button onClick={() => setSettingsDialogOpen(true)} aria-label="Paramètres de synchronisation" className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-[var(--secondary)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]">
               <Key className="h-[18px] w-[18px] text-[var(--foreground)]" />
             </button>
-            <button onClick={doSync} disabled={syncing} className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-[var(--secondary)] transition-colors disabled:opacity-40">
+            <button onClick={doSync} disabled={syncing} aria-label={syncing ? 'Synchronisation en cours' : 'Synchroniser'} aria-busy={syncing} className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-[var(--secondary)] transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]">
               <RefreshCw className={`h-[18px] w-[18px] text-[var(--foreground)] ${syncing ? 'animate-spin' : ''}`} />
             </button>
-            <button onClick={openCreateDialog} className="h-9 w-9 flex items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm active:scale-95 transition-transform">
+            <button onClick={openCreateDialog} aria-label="Ajouter une application" className="h-9 w-9 flex items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm active:scale-95 transition-transform hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]">
               <Plus className="h-[18px] w-[18px]" />
             </button>
           </div>
@@ -333,27 +354,27 @@ export default function Home() {
 
       {/* ---- FILTER PILLS ---- */}
       <div className="max-w-3xl mx-auto w-full px-4 pt-3 pb-1">
-        <div className="flex gap-2 overflow-x-auto ios-scroll scrollbar-none -mx-4 px-4 pb-1">
-          <button onClick={() => { setFilterSource('all'); setFilterCategory('all') }} className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors ${filterSource === 'all' && filterCategory === 'all' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)]'}`}>
+        <div role="group" aria-label="Filtrer par source" className="flex gap-2 overflow-x-auto ios-scroll scrollbar-none -mx-4 px-4 pb-1">
+          <button onClick={() => { setFilterSource('all'); setFilterCategory('all') }} aria-pressed={filterSource === 'all' && filterCategory === 'all'} className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${filterSource === 'all' && filterCategory === 'all' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--secondary)]'}`}>
             Toutes ({apps.length})
           </button>
-          <button onClick={() => setFilterSource('github')} className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors flex items-center gap-1.5 ${filterSource === 'github' ? 'bg-[#24292e] text-white' : 'bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)]'}`}>
-            <Github className="h-3.5 w-3.5" />GitHub ({ghCount})
+          <button onClick={() => setFilterSource('github')} aria-pressed={filterSource === 'github'} className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${filterSource === 'github' ? 'bg-[#24292e] text-white' : 'bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--secondary)]'}`}>
+            <Github className="h-3.5 w-3.5" aria-hidden="true" />GitHub ({ghCount})
           </button>
-          <button onClick={() => setFilterSource('vercel')} className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors flex items-center gap-1.5 ${filterSource === 'vercel' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)]'}`}>
-            <Zap className="h-3.5 w-3.5" />Vercel ({vcCount})
+          <button onClick={() => setFilterSource('vercel')} aria-pressed={filterSource === 'vercel'} className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${filterSource === 'vercel' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--secondary)]'}`}>
+            <Zap className="h-3.5 w-3.5" aria-hidden="true" />Vercel ({vcCount})
           </button>
           {mnCount > 0 && (
-            <button onClick={() => setFilterSource('manual')} className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors ${filterSource === 'manual' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)]'}`}>
+            <button onClick={() => setFilterSource('manual')} aria-pressed={filterSource === 'manual'} className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${filterSource === 'manual' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--secondary)]'}`}>
               Manuel ({mnCount})
             </button>
           )}
         </div>
-        {lastSync && <p className="text-[11px] text-[var(--muted-foreground)] mt-1.5">Derniere synchro : {lastSync}</p>}
+        {lastSync && <p aria-live="polite" className="text-[11px] text-[var(--muted-foreground)] mt-1.5">Dernière synchro : {lastSync}</p>}
       </div>
 
       {/* ---- CONTENT ---- */}
-      <main className="flex-1 max-w-3xl mx-auto w-full px-4 pt-2 pb-24 ios-scroll">
+      <main id="main-content" className="flex-1 max-w-3xl mx-auto w-full px-4 pt-2 pb-24 ios-scroll">
 
         {/* Empty states */}
         {apps.length === 0 && !settings.githubUsername && !settings.vercelToken && (
@@ -372,7 +393,7 @@ export default function Home() {
             <div className="h-16 w-16 rounded-full bg-[var(--secondary)] flex items-center justify-center mb-5">
               <Search className="h-7 w-7 text-[var(--muted-foreground)]" />
             </div>
-            <h3 className="text-[17px] font-semibold mb-1.5">Aucun resultat</h3>
+            <h3 className="text-[17px] font-semibold mb-1.5">Aucun résultat</h3>
             <p className="text-[15px] text-[var(--muted-foreground)]">Modifiez vos filtres ou votre recherche.</p>
           </div>
         )}
@@ -384,8 +405,8 @@ export default function Home() {
               const isAuto = app.source === 'github' || app.source === 'vercel'
               return (
                 <div key={app.id} className="group bg-[var(--card)] rounded-2xl border border-[var(--border)] overflow-hidden active:scale-[0.98] transition-transform duration-150">
-                  <a href={app.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3.5 p-3.5">
-                    <AppIcon name={app.name} url={app.url} />
+                  <a href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`Ouvrir ${app.name} dans un nouvel onglet`} className="flex items-center gap-3.5 p-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)] rounded-2xl">
+                    <AppIcon name={app.name} icon={app.source === 'manual' ? app.icon : undefined} color={app.source === 'manual' ? app.color : undefined} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <h3 className="text-[15px] font-semibold text-[var(--foreground)] truncate">{app.name}</h3>
@@ -399,11 +420,11 @@ export default function Home() {
                   </a>
                   {!isAuto && (
                     <div className="flex border-t border-[var(--border)]">
-                      <button onClick={() => openEditDialog(app)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[13px] text-[var(--muted-foreground)] hover:bg-[var(--secondary)] transition-colors border-r border-[var(--border)]">
-                        <Pencil className="h-3.5 w-3.5" />Modifier
+                      <button onClick={() => openEditDialog(app)} aria-label={`Modifier ${app.name}`} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[13px] text-[var(--muted-foreground)] hover:bg-[var(--secondary)] transition-colors border-r border-[var(--border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]">
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />Modifier
                       </button>
-                      <button onClick={() => openDeleteDialog(app)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[13px] text-[var(--destructive)] hover:bg-[var(--destructive)]/10 transition-colors">
-                        <Trash2 className="h-3.5 w-3.5" />Supprimer
+                      <button onClick={() => openDeleteDialog(app)} aria-label={`Supprimer ${app.name}`} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[13px] text-[var(--destructive)] hover:bg-[var(--destructive)]/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--destructive)]">
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />Supprimer
                       </button>
                     </div>
                   )}
@@ -418,9 +439,10 @@ export default function Home() {
       <div className="fixed bottom-6 right-6 z-20 sm:hidden" style={{ marginBottom: 'var(--safe-bottom)' }}>
         <button
           onClick={openCreateDialog}
-          className="h-14 w-14 rounded-full bg-[#6e40c9] text-white shadow-lg shadow-[#6e40c9]/30 flex items-center justify-center active:scale-90 transition-transform"
+          aria-label="Ajouter une application"
+          className="h-14 w-14 rounded-full bg-[#6e40c9] text-white shadow-lg shadow-[#6e40c9]/30 flex items-center justify-center active:scale-90 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6e40c9] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
         >
-          <Plus className="h-6 w-6" />
+          <Plus className="h-6 w-6" aria-hidden="true" />
         </button>
       </div>
 
@@ -444,9 +466,12 @@ export default function Home() {
               <Label htmlFor="vc-token" className="text-[13px]">Token Vercel</Label>
               <Input id="vc-token" type="password" placeholder="vcp_xxx" value={settings.vercelToken} onChange={(e) => setSettings({ ...settings, vercelToken: e.target.value })} className="h-11 rounded-xl" />
             </div>
+            <p className="text-[11px] text-[var(--muted-foreground)] leading-relaxed rounded-xl bg-[var(--secondary)] px-3 py-2">
+              Les tokens sont stockés localement dans votre navigateur (localStorage) et ne sont jamais envoyés à un serveur. Utilisez des tokens en lecture seule et révoquez-les si votre appareil est partagé.
+            </p>
             <div className="flex items-center justify-between py-1">
-              <div><Label className="text-[13px]">Sync automatique</Label><p className="text-[11px] text-[var(--muted-foreground)]">Toutes les 5 min + au chargement</p></div>
-              <button type="button" onClick={() => setSettings({ ...settings, autoSync: !settings.autoSync })} className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ${settings.autoSync ? 'bg-[#6e40c9]' : 'bg-[var(--muted)]'}`}>
+              <div><Label id="autosync-label" className="text-[13px]">Sync automatique</Label><p className="text-[11px] text-[var(--muted-foreground)]">Toutes les 5 min + au chargement</p></div>
+              <button type="button" role="switch" aria-checked={settings.autoSync} aria-labelledby="autosync-label" onClick={() => setSettings({ ...settings, autoSync: !settings.autoSync })} className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)] ${settings.autoSync ? 'bg-[#6e40c9]' : 'bg-[var(--muted)]'}`}>
                 <span className={`pointer-events-none inline-block h-5.5 w-5.5 translate-y-0.5 rounded-full bg-white shadow-md transition duration-200 ${settings.autoSync ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
               </button>
             </div>
@@ -478,21 +503,21 @@ export default function Home() {
             </div>
             <div className="grid gap-1.5">
               <Label className="text-[13px]">Description</Label>
-              <Textarea placeholder="Decrivez l'application..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} className="rounded-xl" />
+              <Textarea placeholder="Décrivez l'application..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} className="rounded-xl" />
             </div>
             <div className="grid gap-1.5">
-              <Label className="text-[13px]">Categorie</Label>
+              <Label className="text-[13px]">Catégorie</Label>
               <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
                 <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
                 <SelectContent>{categoryPresets.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="grid gap-1.5">
-              <Label className="text-[13px]">Icone</Label>
+              <Label className="text-[13px]">Icône</Label>
               <div className="grid grid-cols-6 gap-2">
                 {iconOptions.map((iconName) => { const Ic = iconMap[iconName]; return (
-                  <button key={iconName} type="button" onClick={() => setFormData({ ...formData, icon: iconName })} className={`flex items-center justify-center h-11 w-full rounded-xl border-2 transition-all ${formData.icon === iconName ? 'border-[#6e40c9] bg-[#6e40c9]/10 text-[#6e40c9]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}>
-                    <Ic className="h-4 w-4" />
+                  <button key={iconName} type="button" onClick={() => setFormData({ ...formData, icon: iconName })} aria-label={`Icône ${iconName}`} aria-pressed={formData.icon === iconName} className={`flex items-center justify-center h-11 w-full rounded-xl border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${formData.icon === iconName ? 'border-[#6e40c9] bg-[#6e40c9]/10 text-[#6e40c9]' : 'border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--muted-foreground)]'}`}>
+                    <Ic className="h-4 w-4" aria-hidden="true" />
                   </button>
                 )})}
               </div>
@@ -501,8 +526,8 @@ export default function Home() {
               <Label className="text-[13px]">Couleur</Label>
               <div className="flex flex-wrap gap-2.5">
                 {colorOptions.map((color) => (
-                  <button key={color} type="button" onClick={() => setFormData({ ...formData, color })} className={`h-9 w-9 rounded-full border-2 transition-all flex items-center justify-center ${formData.color === color ? 'border-[var(--foreground)] scale-110' : 'border-transparent'}`} style={{ backgroundColor: color }}>
-                    {formData.color === color && <Check className="h-3.5 w-3.5 text-white" />}
+                  <button key={color} type="button" onClick={() => setFormData({ ...formData, color })} aria-label={`Couleur ${color}`} aria-pressed={formData.color === color} className={`h-9 w-9 rounded-full border-2 transition-all flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)] ${formData.color === color ? 'border-[var(--foreground)] scale-110' : 'border-transparent'}`} style={{ backgroundColor: color }}>
+                    {formData.color === color && <Check className="h-3.5 w-3.5 text-white" aria-hidden="true" />}
                   </button>
                 ))}
               </div>
@@ -521,7 +546,7 @@ export default function Home() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-[17px]">Supprimer ?</AlertDialogTitle>
             <AlertDialogDescription className="text-[15px] leading-relaxed">
-              <span className="font-semibold">{deletingApp?.name}</span> sera definitivement supprime.
+              <span className="font-semibold">{deletingApp?.name}</span> sera définitivement supprimé.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
