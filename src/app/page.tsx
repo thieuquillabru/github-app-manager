@@ -80,7 +80,11 @@ const BUNDLED_APPS: AppItem[] = [
   { id: 'github-ExchangeMGA', name: 'ExchangeMGA', url: 'https://thieuquillabru.github.io/ExchangeMGA/', description: 'Convertisseur Yuan -> Ariary (MGA) avec cours en temps reel', category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'BarChart3', order: 3, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'ExchangeMGA' },
   { id: 'github-EnergyX', name: 'EnergyX', url: 'https://thieuquillabru.github.io/EnergyX/', description: 'Developpement personnel : habitudes, objectifs, journal, meditation', category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'Zap', order: 4, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'EnergyX' },
   { id: 'github-akiba', name: 'akiba', url: 'https://thieuquillabru.github.io/akiba/', description: "Gestion d'argent, tontine et education financiere. PWA en 8 langues et 166 devises.", category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'BookOpen', order: 5, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'akiba' },
-  { id: 'vercel-prj_sYrYBUNllneM4DQr3dOszFeLfxxy', name: 'agent-reach-web', url: 'https://agent-reach-web-zeta.vercel.app', description: 'Agent Reach - Recherche multi-plateforme (YouTube, GitHub, RSS, V2EX...)', category: 'Vercel', color: VERCEL_COLOR, icon: 'Globe', order: 6, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'vercel', repoName: 'agent-reach-web' },
+  { id: 'github-albion-market-tracker', name: 'albion-market-tracker', url: 'https://thieuquillabru.github.io/albion-market-tracker/', description: 'Albion Online Market Tracker - Prix en temps réel, Black Market, Opportunités de profit', category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'BarChart3', order: 6, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'albion-market-tracker' },
+  { id: 'github-gear-up', name: 'gear-up', url: 'https://thieuquillabru.github.io/gear-up/', description: 'Gear Up — vitrine interactive de matériel gaming (style Street Flavor)', category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'Gamepad2', order: 7, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'gear-up' },
+  { id: 'github-tech-flavor-banner', name: 'tech-flavor-banner', url: 'https://thieuquillabru.github.io/tech-flavor-banner/', description: 'Tech Flavor — bannière animée de matériel tech pour Shopify', category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'Zap', order: 8, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'tech-flavor-banner' },
+  { id: 'github-chimes', name: 'chimes', url: 'https://thieuquillabru.github.io/chimes/', description: 'Chimes — vitrine interactive de rideaux de perles', category: 'GitHub Pages', color: GITHUB_PAGES_COLOR, icon: 'Music', order: 9, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'github', repoName: 'chimes' },
+  { id: 'vercel-prj_sYrYBUNllneM4DQr3dOszFeLfxxy', name: 'agent-reach-web', url: 'https://agent-reach-web-zeta.vercel.app', description: 'Agent Reach - Recherche multi-plateforme (YouTube, GitHub, RSS, V2EX...)', category: 'Vercel', color: VERCEL_COLOR, icon: 'Globe', order: 10, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), source: 'vercel', repoName: 'agent-reach-web' },
 ]
 
 function generateId(): string { return Date.now().toString(36) + Math.random().toString(36).substring(2, 9) }
@@ -216,8 +220,16 @@ export default function Home() {
         }
         return changed ? { ...app, url } : app
       })
-      setApps(fixed)
-      if (changed) saveToStorage(APPS_KEY, fixed)
+      // Reconcile bundled apps: users who opened the app before new apps were
+      // added have an outdated list frozen in localStorage. Add any bundled app
+      // that is missing so previously-hidden apps become visible again — without
+      // touching the user's manual apps or their edits to existing entries.
+      const existingIds = new Set(fixed.map((a) => a.id))
+      const missingBundled = BUNDLED_APPS.filter((b) => !existingIds.has(b.id))
+      const reconciled = missingBundled.length > 0 ? [...fixed, ...missingBundled] : fixed
+      if (missingBundled.length > 0) changed = true
+      setApps(reconciled)
+      if (changed) saveToStorage(APPS_KEY, reconciled)
     }
     setSettings(effectiveSettings)
     const savedSync = localStorage.getItem('github-app-manager-last-sync')
