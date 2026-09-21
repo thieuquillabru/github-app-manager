@@ -6,6 +6,7 @@ import {
   Link2, Globe, Code2, Database, Server, Smartphone, Monitor, Cloud,
   Zap, BookOpen, ShoppingCart, MessageSquare, BarChart3, Settings,
   Gamepad2, Palette, Music, RefreshCw, Key, ChevronRight, Filter,
+  LayoutGrid, List, Sparkles, ArrowUpRight,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -188,6 +189,7 @@ export default function Home() {
   const [syncing, setSyncing] = useState(false)
   const [lastSync, setLastSync] = useState<string | null>(null)
   const [showSearch, setShowSearch] = useState(false)
+  const [view, setView] = useState<'list' | 'grid'>('grid')
   const syncTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { toast } = useToast()
 
@@ -220,9 +222,13 @@ export default function Home() {
     setSettings(effectiveSettings)
     const savedSync = localStorage.getItem('github-app-manager-last-sync')
     if (savedSync) setLastSync(savedSync)
+    const savedView = localStorage.getItem('github-app-manager-view')
+    if (savedView === 'list' || savedView === 'grid') setView(savedView)
     setMounted(true)
   }, [])
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => { if (mounted) localStorage.setItem('github-app-manager-view', view) }, [view, mounted])
 
   useEffect(() => { if (mounted) saveToStorage(APPS_KEY, apps) }, [apps, mounted])
   useEffect(() => { if (mounted) saveToStorage(SETTINGS_KEY, settings) }, [settings, mounted])
@@ -293,10 +299,14 @@ export default function Home() {
     return (
       <div className="min-h-[100dvh] bg-[var(--background)]">
         <div className="h-14" style={{ paddingTop: 'var(--safe-top)' }} />
-        <div className="px-4 pt-4 pb-2"><div className="h-7 w-48 rounded-full bg-[var(--muted)] animate-pulse" /></div>
-        <div className="px-4 pt-2"><div className="h-10 rounded-2xl bg-[var(--muted)] animate-pulse" /></div>
-        <div className="px-4 pt-6 space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (<div key={i} className="h-[72px] rounded-2xl bg-[var(--card)] animate-pulse" />))}
+        <div className="max-w-5xl mx-auto px-4 pt-4">
+          <div className="h-40 rounded-3xl bg-[var(--muted)] animate-pulse" />
+        </div>
+        <div className="max-w-5xl mx-auto px-4 pt-4 flex gap-2">
+          {Array.from({ length: 3 }).map((_, i) => (<div key={i} className="h-8 w-24 rounded-full bg-[var(--muted)] animate-pulse" />))}
+        </div>
+        <div className="max-w-5xl mx-auto px-4 pt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (<div key={i} className="h-[96px] rounded-2xl bg-[var(--card)] border border-[var(--border)] animate-pulse" />))}
         </div>
       </div>
     )
@@ -308,10 +318,10 @@ export default function Home() {
 
       {/* ---- HEADER ---- */}
       <header className="sticky top-0 z-30 bg-[var(--background)]/80 backdrop-blur-xl backdrop-saturate-180% border-b border-[var(--border)]">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#6e40c9] to-[#a855f7] flex items-center justify-center shadow-sm">
-              <Github className="h-4 w-4 text-white" />
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-[#6e40c9] to-[#a855f7] flex items-center justify-center shadow-sm shadow-[#6e40c9]/30">
+              <LayoutGrid className="h-4 w-4 text-white" />
             </div>
             <div>
               <h1 className="text-[17px] font-semibold tracking-tight text-[var(--foreground)] leading-none">App Manager</h1>
@@ -321,6 +331,9 @@ export default function Home() {
           <div className="flex items-center gap-1.5">
             <button onClick={() => setShowSearch(!showSearch)} aria-label={showSearch ? 'Fermer la recherche' : 'Rechercher'} aria-expanded={showSearch} className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-[var(--secondary)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]">
               {showSearch ? <X className="h-[18px] w-[18px] text-[var(--foreground)]" /> : <Search className="h-[18px] w-[18px] text-[var(--foreground)]" />}
+            </button>
+            <button onClick={() => setView(view === 'grid' ? 'list' : 'grid')} aria-label={view === 'grid' ? 'Affichage en liste' : 'Affichage en grille'} title={view === 'grid' ? 'Vue liste' : 'Vue grille'} className="hidden sm:flex h-9 w-9 items-center justify-center rounded-full hover:bg-[var(--secondary)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]">
+              {view === 'grid' ? <List className="h-[18px] w-[18px] text-[var(--foreground)]" /> : <LayoutGrid className="h-[18px] w-[18px] text-[var(--foreground)]" />}
             </button>
             <ThemeToggle />
             <button onClick={() => setSettingsDialogOpen(true)} aria-label="Paramètres de synchronisation" className="h-9 w-9 flex items-center justify-center rounded-full hover:bg-[var(--secondary)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]">
@@ -352,8 +365,41 @@ export default function Home() {
         )}
       </header>
 
+      {/* ---- HERO / STATS ---- */}
+      <div className="max-w-5xl mx-auto w-full px-4 pt-4">
+        <div className="relative overflow-hidden rounded-3xl p-5 sm:p-6 bg-gradient-to-br from-[#6e40c9] via-[#7c3aed] to-[#a855f7] shadow-lg shadow-[#6e40c9]/20">
+          <div aria-hidden="true" className="absolute -top-16 -right-10 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
+          <div aria-hidden="true" className="absolute -bottom-20 -left-8 h-52 w-52 rounded-full bg-black/10 blur-2xl" />
+          <div className="relative">
+            <div className="flex items-center gap-1.5 text-white/80 text-[12px] font-medium mb-1.5">
+              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Tableau de bord
+            </div>
+            <h2 className="text-white text-[22px] sm:text-[26px] font-bold tracking-tight leading-tight">
+              Toutes vos apps, au même endroit
+            </h2>
+            <p className="text-white/75 text-[13px] sm:text-[14px] mt-1 max-w-md">
+              Synchronisées automatiquement depuis GitHub Pages et Vercel.
+            </p>
+            <div className="grid grid-cols-3 gap-2.5 mt-5">
+              <div className="rounded-2xl bg-white/12 backdrop-blur-sm px-3 py-2.5 border border-white/15">
+                <p className="text-white text-[20px] sm:text-[24px] font-bold leading-none">{apps.length}</p>
+                <p className="text-white/70 text-[11px] mt-1">Applications</p>
+              </div>
+              <div className="rounded-2xl bg-white/12 backdrop-blur-sm px-3 py-2.5 border border-white/15">
+                <p className="text-white text-[20px] sm:text-[24px] font-bold leading-none flex items-center gap-1"><Github className="h-4 w-4" aria-hidden="true" />{ghCount}</p>
+                <p className="text-white/70 text-[11px] mt-1">GitHub Pages</p>
+              </div>
+              <div className="rounded-2xl bg-white/12 backdrop-blur-sm px-3 py-2.5 border border-white/15">
+                <p className="text-white text-[20px] sm:text-[24px] font-bold leading-none flex items-center gap-1"><Zap className="h-4 w-4" aria-hidden="true" />{vcCount}</p>
+                <p className="text-white/70 text-[11px] mt-1">Vercel</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ---- FILTER PILLS ---- */}
-      <div className="max-w-3xl mx-auto w-full px-4 pt-3 pb-1">
+      <div className="max-w-5xl mx-auto w-full px-4 pt-3 pb-1">
         <div role="group" aria-label="Filtrer par source" className="flex gap-2 overflow-x-auto ios-scroll scrollbar-none -mx-4 px-4 pb-1">
           <button onClick={() => { setFilterSource('all'); setFilterCategory('all') }} aria-pressed={filterSource === 'all' && filterCategory === 'all'} className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] ${filterSource === 'all' && filterCategory === 'all' ? 'bg-[var(--primary)] text-[var(--primary-foreground)]' : 'bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--secondary)]'}`}>
             Toutes ({apps.length})
@@ -374,7 +420,7 @@ export default function Home() {
       </div>
 
       {/* ---- CONTENT ---- */}
-      <main id="main-content" className="flex-1 max-w-3xl mx-auto w-full px-4 pt-2 pb-24 ios-scroll">
+      <main id="main-content" className="flex-1 max-w-5xl mx-auto w-full px-4 pt-3 pb-24 ios-scroll">
 
         {/* Empty states */}
         {apps.length === 0 && !settings.githubUsername && !settings.vercelToken && (
@@ -398,28 +444,32 @@ export default function Home() {
           </div>
         )}
 
-        {/* ---- APP LIST ---- */}
+        {/* ---- APP LIST / GRID ---- */}
         {filteredApps.length > 0 && (
-          <div className="space-y-2">
+          <div className={view === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3' : 'space-y-2.5'}>
             {filteredApps.map((app) => {
               const isAuto = app.source === 'github' || app.source === 'vercel'
               return (
-                <div key={app.id} className="group bg-[var(--card)] rounded-2xl border border-[var(--border)] overflow-hidden active:scale-[0.98] transition-transform duration-150">
-                  <a href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`Ouvrir ${app.name} dans un nouvel onglet`} className="flex items-center gap-3.5 p-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)] rounded-2xl">
+                <div key={app.id} className="group relative bg-[var(--card)] rounded-2xl border border-[var(--border)] overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5 hover:border-[var(--muted-foreground)]/30 active:scale-[0.99] flex flex-col">
+                  <span aria-hidden="true" className="absolute inset-x-0 top-0 h-[3px] opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{ background: app.source === 'manual' ? app.color : app.source === 'github' ? '#24292e' : 'linear-gradient(90deg,#6e40c9,#a855f7)' }} />
+                  <a href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`Ouvrir ${app.name} dans un nouvel onglet`} className={`flex gap-3.5 p-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)] rounded-2xl flex-1 ${view === 'grid' ? 'items-start' : 'items-center'}`}>
                     <AppIcon name={app.name} icon={app.source === 'manual' ? app.icon : undefined} color={app.source === 'manual' ? app.color : undefined} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <h3 className="text-[15px] font-semibold text-[var(--foreground)] truncate">{app.name}</h3>
-                        {app.source === 'github' && <span className="shrink-0 text-[10px] font-medium text-[#24292e] bg-[#24292e]/10 px-1.5 py-0.5 rounded-md">GH</span>}
-                        {app.source === 'vercel' && <span className="shrink-0 text-[10px] font-medium text-[var(--foreground)] bg-[var(--secondary)] px-1.5 py-0.5 rounded-md">VC</span>}
+                        {app.source === 'github' && <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium text-[#24292e] bg-[#24292e]/10 px-1.5 py-0.5 rounded-md"><Github className="h-2.5 w-2.5" aria-hidden="true" />GH</span>}
+                        {app.source === 'vercel' && <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium text-[var(--foreground)] bg-[var(--secondary)] px-1.5 py-0.5 rounded-md"><Zap className="h-2.5 w-2.5" aria-hidden="true" />VC</span>}
+                        {app.source === 'manual' && <span className="shrink-0 text-[10px] font-medium text-[var(--muted-foreground)] bg-[var(--secondary)] px-1.5 py-0.5 rounded-md">{app.category}</span>}
                       </div>
-                      {app.description && <p className="text-[13px] text-[var(--muted-foreground)] truncate mt-0.5 leading-snug">{app.description}</p>}
-                      <p className="text-[11px] text-[var(--muted-foreground)]/60 font-mono truncate mt-0.5">{app.url}</p>
+                      {app.description && <p className={`text-[13px] text-[var(--muted-foreground)] mt-1 leading-snug ${view === 'grid' ? 'line-clamp-2 min-h-[2.4em]' : 'truncate'}`}>{app.description}</p>}
+                      <p className="text-[11px] text-[var(--muted-foreground)]/60 font-mono truncate mt-1">{app.url.replace(/^https?:\/\//, '')}</p>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-[var(--muted-foreground)]/40 shrink-0" />
+                    {view === 'grid'
+                      ? <ArrowUpRight className="h-4 w-4 text-[var(--muted-foreground)]/40 shrink-0 group-hover:text-[var(--foreground)] transition-colors" aria-hidden="true" />
+                      : <ChevronRight className="h-4 w-4 text-[var(--muted-foreground)]/40 shrink-0" aria-hidden="true" />}
                   </a>
                   {!isAuto && (
-                    <div className="flex border-t border-[var(--border)]">
+                    <div className="flex border-t border-[var(--border)] mt-auto">
                       <button onClick={() => openEditDialog(app)} aria-label={`Modifier ${app.name}`} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[13px] text-[var(--muted-foreground)] hover:bg-[var(--secondary)] transition-colors border-r border-[var(--border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]">
                         <Pencil className="h-3.5 w-3.5" aria-hidden="true" />Modifier
                       </button>
