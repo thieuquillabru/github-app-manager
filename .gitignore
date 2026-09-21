@@ -64,3 +64,8 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+
+.preview/
+out/
+package-lock.json

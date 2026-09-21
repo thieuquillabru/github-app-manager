@@ -1,0 +1,25 @@
+diff --git a/.github/workflows/deploy.yml b/.github/workflows/deploy.yml
+index 1df72de..7e967d3 100755
+--- a/.github/workflows/deploy.yml
++++ b/.github/workflows/deploy.yml
+@@ -22,7 +22,20 @@ jobs:
+       - uses: oven-sh/setup-bun@v2
+         with:
+           bun-version: latest
++      # The test runner imports src/lib/sync.ts directly and relies on native
++      # TypeScript type stripping, available from Node 22.18.
++      - uses: actions/setup-node@v4
++        with:
++          node-version: '22.x'
+       - run: bun install --frozen-lockfile
++      # Quality gate: these would have caught the "apps disappeared" regression
++      # before it ever reached production.
++      - name: Typecheck
++        run: bun run typecheck
++      - name: Lint
++        run: bun run lint
++      - name: Unit tests
++        run: npm test
+       - name: Build with tokens
+         run: bun run build
+         env:
